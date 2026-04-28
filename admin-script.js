@@ -2,6 +2,7 @@ const API = 'http://localhost:3001/api';
 const PASSWORD = 'admin123';
 
 let isLoggedIn = false;
+let adminToken = null;
 
 // DOM Elements
 const loginContainer = document.getElementById('login-container');
@@ -64,7 +65,7 @@ async function handleMediaUpload(e) {
   try {
     const response = await fetch(`${API}/admin/upload`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer local-token` },
+      headers: { 'Authorization': `Bearer ${adminToken}` },
       body: formData
     });
 
@@ -81,22 +82,36 @@ async function handleMediaUpload(e) {
   }
 }
 
-function handleLogin(e) {
+async function handleLogin(e) {
   e.preventDefault();
   
-  if (passwordInput.value === PASSWORD) {
-    isLoggedIn = true;
-    loginContainer.classList.add('hidden');
-    dashboard.classList.remove('hidden');
-    loadDashboardData();
-  } else {
-    alert('Invalid password');
-    passwordInput.value = '';
+  try {
+    const response = await fetch(`${API}/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: passwordInput.value })
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      adminToken = data.token;
+      isLoggedIn = true;
+      loginContainer.classList.add('hidden');
+      dashboard.classList.remove('hidden');
+      loadDashboardData();
+    } else {
+      alert('Invalid password');
+      passwordInput.value = '';
+    }
+  } catch (error) {
+    console.error('Login error:', error);
+    alert('Login failed: ' + error.message);
   }
 }
 
 function handleLogout() {
   isLoggedIn = false;
+  adminToken = null;
   loginContainer.classList.remove('hidden');
   dashboard.classList.add('hidden');
   passwordInput.value = '';

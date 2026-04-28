@@ -607,6 +607,29 @@ app.post('/api/admin/upload', verifyAdmin, upload.single('image'), (req, res) =>
   }
 });
 
+// PUBLIC: Get all images (no auth required)
+app.get('/api/images', (req, res) => {
+  try {
+    const files = fs.readdirSync(uploadsDir);
+    const images = files.map(filename => {
+      const filepath = path.join(uploadsDir, filename);
+      const stat = fs.statSync(filepath);
+      return {
+        id: filename,
+        filename,
+        url: `/uploads/${filename}`,
+        size: stat.size,
+        uploadedAt: stat.birthtime.toISOString()
+      };
+    });
+
+    res.json(images);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch images' });
+  }
+});
+
+// ADMIN: Get all images (admin only)
 app.get('/api/admin/images', verifyAdmin, (req, res) => {
   try {
     const files = fs.readdirSync(uploadsDir);

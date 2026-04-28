@@ -241,7 +241,7 @@ body.dark-mode {
 .site-header {
   position: relative;
   overflow: hidden;
-  padding: 20px 16px;
+  padding: 15px 16px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: white;
   text-align: center;
@@ -277,16 +277,33 @@ body.dark-mode {
 }
 
 .main-title {
-  font-size: 2.2rem;
+  font-size: 1.6rem;
   font-weight: 800;
-  margin: 0 0 8px 0;
+  margin: 0 0 4px 0;
   letter-spacing: -1px;
   animation: slideInDown 0.8s ease-out;
 }
 
+.logo {
+  height: 30px;
+  width: 30px;
+  margin: 0 auto 8px auto;
+  display: block;
+  animation: spin 3s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .tagline {
-  font-size: 0.95rem;
-  margin: 0 0 15px 0;
+  font-size: 0.85rem;
+  margin: 0 0 8px 0;
   opacity: 0.95;
   font-weight: 300;
   animation: slideInUp 0.8s ease-out 0.2s both;
@@ -295,8 +312,8 @@ body.dark-mode {
 .header-decoration {
   display: flex;
   justify-content: center;
-  gap: 15px;
-  margin-top: 30px;
+  gap: 10px;
+  margin-top: 10px;
   animation: fadeIn 1s ease-out 0.4s both;
 }
 
@@ -453,10 +470,10 @@ body.dark-mode {
 .featured-post {
   display: block;
   background: var(--card);
-  padding: 16px;
-  border-radius: 12px;
+  padding: 12px;
+  border-radius: 8px;
   box-shadow: var(--shadow);
-  margin-bottom: 30px;
+  margin-bottom: 20px;
   transition:
     transform 0.3s ease,
     box-shadow 0.3s ease;
@@ -822,6 +839,16 @@ body.dark-mode {
 
 .featured-visual {
   position: relative;
+  max-width: 300px;
+  margin: 0 auto;
+}
+
+.featured-image {
+  width: 100%;
+  height: auto;
+  max-width: 400px;
+  border-radius: 8px;
+  object-fit: cover;
 }
 
 .placeholder-image {

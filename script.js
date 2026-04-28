@@ -1259,7 +1259,7 @@ async function loadGalleryImages() {
   galleryList.innerHTML = '';
 
   try {
-    const response = await fetch('http://localhost:3001/api/admin/images');
+    const response = await fetch('http://localhost:3001/api/images');
     if (response.ok) {
       const images = await response.json();
       galleryLoading.style.display = 'none';
