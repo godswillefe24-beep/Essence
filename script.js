@@ -1001,11 +1001,86 @@ async function handleSubscribe() {
         showNotification(error.error || 'Already subscribed with this email!', 'info');
       }
     } catch (error) {
-      showNotification('Subscription failed - please try again', 'error');
+      console.warn('Subscription API unavailable, saving locally', error);
+      // Fallback: save subscriber locally
+      const data = db.getData();
+      data.subscribers = data.subscribers || [];
+      if (!data.subscribers.includes(email)) {
+        data.subscribers.push(email);
+        db.saveData(data);
+        showNotification('✓ Subscribed locally (offline). Thank you!', 'success');
+        emailInput.value = '';
+        updateAnalytics();
+      } else {
+        showNotification('Already subscribed (local copy).', 'info');
+      }
       console.error('Error subscribing:', error);
     }
   }
 }
+
+// ============================================
+// TABLE OF CONTENTS & AUTHOR BIO FOR POST PAGES
+// ============================================
+
+function generateTOCAndAuthor() {
+  // Detect post article on post pages
+  const article = document.querySelector('article.post-preview, article.post-article, article');
+  if (!article) return;
+
+  // Find headings inside article
+  const headings = article.querySelectorAll('h2, h3');
+  if (!headings || headings.length === 0) return;
+
+  // Create TOC container
+  const toc = document.createElement('nav');
+  toc.className = 'post-toc';
+  toc.innerHTML = '<strong>On this page</strong>';
+
+  const list = document.createElement('ul');
+  list.className = 'toc-list';
+
+  headings.forEach((h, i) => {
+    const id = h.id || `toc-${i}-${h.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+    h.id = id;
+    const li = document.createElement('li');
+    li.className = `toc-${h.tagName.toLowerCase()}`;
+    li.innerHTML = `<a href="#${id}">${h.textContent}</a>`;
+    list.appendChild(li);
+  });
+
+  toc.appendChild(list);
+
+  // Insert TOC before the article
+  article.parentNode.insertBefore(toc, article);
+
+  // Create simple author bio block
+  const authorName = document.querySelector('meta[name="author"]')?.content || 'Efe';
+  const bio = document.createElement('div');
+  bio.className = 'post-author';
+  bio.innerHTML = `
+    <div class="author-avatar">${(authorName || 'E').charAt(0)}</div>
+    <div class="author-info">
+      <div class="author-name">${authorName}</div>
+      <div class="author-desc">${authorName} writes about technology, design, and web development. Follow for practical guides and thoughtful essays.</div>
+    </div>
+  `;
+
+  // Append author bio after article
+  article.parentNode.insertBefore(bio, article.nextSibling);
+
+  // Smooth scroll for TOC links
+  toc.querySelectorAll('a').forEach(a => {
+    a.addEventListener('click', (e) => {
+      e.preventDefault();
+      const target = document.querySelector(a.getAttribute('href'));
+      if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+}
+
+// Run TOC generator on post pages
+window.addEventListener('load', generateTOCAndAuthor);
 
 // ============================================
 // HEADER & HERO INTERACTIONS

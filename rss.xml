@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+    <channel>
+        <title>Essence</title>
+        <link>https://essence-blog.com/</link>
+        <description>A modern blog with insights, stories, and ideas on technology and design.</description>
+        <language>en-us</language>
+        <lastBuildDate>Mon, 04 May 2026 00:00:00 GMT</lastBuildDate>
+
+        <item>
+            <title>Welcome to my blog</title>
+            <link>https://essence-blog.com/posts/post1.html</link>
+            <description>An introduction to blogging with insights on content creation and digital storytelling.</description>
+            <pubDate>Wed, 26 Nov 2025 00:00:00 GMT</pubDate>
+            <guid>https://essence-blog.com/posts/post1.html</guid>
+        </item>
+
+        <item>
+            <title>Latest Technology News and Innovations</title>
+            <link>https://essence-blog.com/posts/post2.html</link>
+            <description>Explore the latest breakthroughs in AI, quantum computing, renewable energy, and cybersecurity.</description>
+            <pubDate>Mon, 01 Mar 2026 00:00:00 GMT</pubDate>
+            <guid>https://essence-blog.com/posts/post2.html</guid>
+        </item>
+
+        <item>
+            <title>Getting Started with Your Blog</title>
+            <link>https://essence-blog.com/posts/post3.html</link>
+            <description>Essential steps to get your blog up and running and build a dedicated audience.</description>
+            <pubDate>Wed, 10 Dec 2025 00:00:00 GMT</pubDate>
+            <guid>https://essence-blog.com/posts/post3.html</guid>
+        </item>
+
+        <item>
+            <title>Advanced Customization Techniques</title>
+            <link>https://essence-blog.com/posts/post4.html</link>
+            <description>Master CSS Grid, custom properties, and JavaScript for professional web design.</description>
+            <pubDate>Thu, 15 Jan 2026 00:00:00 GMT</pubDate>
+            <guid>https://essence-blog.com/posts/post4.html</guid>
+        </item>
+
+    </channel>
+</rss>

@@ -1121,6 +1121,63 @@ body.dark-mode {
   border-bottom: none;
 }
 
+/* POST TABLE OF CONTENTS */
+.post-toc {
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 12px 16px;
+  margin-bottom: 18px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+.post-toc .toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0 0;
+}
+.post-toc .toc-list li {
+  margin: 6px 0;
+}
+.post-toc .toc-list li a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.post-toc .toc-list .toc-h3 {
+  margin-left: 8px;
+  font-size: 0.95rem;
+}
+
+/* AUTHOR BIO */
+.post-author {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 12px;
+  border-radius: 10px;
+  margin-top: 20px;
+}
+.post-author .author-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-dark));
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+.post-author .author-name {
+  font-weight: 700;
+}
+.post-author .author-desc {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
 /* POST TOOLBAR */
 .post-toolbar {
   display: flex;
