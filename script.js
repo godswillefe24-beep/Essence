@@ -1345,7 +1345,7 @@ async function loadGalleryImages() {
       }
 
       galleryList.innerHTML = images.map(img => `
-        <img src="${img.url}" alt="Gallery image" onclick="insertImage('${img.url}')" style="cursor: pointer;" />
+        <img src="${img.url}" loading="lazy" alt="Gallery image" onclick="insertImage('${img.url}')" style="cursor: pointer;" />
       `).join('');
     } else {
       throw new Error('Failed to load images');
@@ -1361,7 +1361,7 @@ function insertImage(imageUrl) {
   const fullUrl = window.location.origin + imageUrl;
   
   // Create image HTML
-  const imageHtml = `<figure style="margin: 20px 0; text-align: center;"><img src="${fullUrl}" alt="Post image" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" /><figcaption style="margin-top: 10px; color: #64748b; font-size: 0.9rem;"></figcaption></figure>`;
+  const imageHtml = `<figure style="margin: 20px 0; text-align: center;"><img src="${fullUrl}" loading="lazy" alt="Post image" style="max-width: 100%; height: auto; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);" /><figcaption style="margin-top: 10px; color: #64748b; font-size: 0.9rem;"></figcaption></figure>`;
   
   // Insert into article
   const article = document.querySelector('article');
