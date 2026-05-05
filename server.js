@@ -60,7 +60,9 @@ app.use('/uploads', express.static(uploadsDir));
 const commentsFile = path.join(__dirname, 'data', 'comments.json');
 const analyticsFile = path.join(__dirname, 'data', 'analytics.json');
 const subscribersFile = path.join(__dirname, 'data', 'subscribers.json');
+const postsFile = path.join(__dirname, 'data', 'posts.json');
 const usersFile = path.join(__dirname, 'data', 'users.json');
+const settingsFile = path.join(__dirname, 'data', 'settings.json');
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
@@ -88,6 +90,12 @@ function initializeDataFiles() {
   }
   if (!fs.existsSync(usersFile)) {
     fs.writeFileSync(usersFile, JSON.stringify([], null, 2));
+  }
+  if (!fs.existsSync(postsFile)) {
+    fs.writeFileSync(postsFile, JSON.stringify([], null, 2));
+  }
+  if (!fs.existsSync(settingsFile)) {
+    fs.writeFileSync(settingsFile, JSON.stringify({ title: 'Essence', description: 'A modern blog', adminPassword: (process.env.ADMIN_PASSWORD || 'admin123') }, null, 2));
   }
 }
 
@@ -205,6 +213,120 @@ app.get('/api/analytics', (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+// ==========================================
+// POSTS: Public list and admin create/delete
+// ==========================================
+
+function readPosts() {
+  try {
+    const raw = fs.readFileSync(postsFile, 'utf8');
+    return JSON.parse(raw || '[]');
+  } catch (err) {
+    return [];
+  }
+}
+
+function writePosts(list) {
+  fs.writeFileSync(postsFile, JSON.stringify(list, null, 2));
+}
+
+// Public: list posts metadata
+app.get('/api/posts', (req, res) => {
+  try {
+    const posts = readPosts();
+    res.json(posts);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch posts' });
+  }
+});
+
+// Admin: create post (persist metadata and write HTML file)
+app.post('/api/admin/posts', verifyAdmin, (req, res) => {
+  try {
+    const { id, title, category, content, date } = req.body;
+    if (!id || !title || !content) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const posts = readPosts();
+
+    const postMeta = {
+      id,
+      title,
+      category: category || 'Uncategorized',
+      date: date || new Date().toISOString(),
+      slug: id,
+      excerpt: (content || '').slice(0, 160)
+    };
+
+    posts.unshift(postMeta);
+    writePosts(posts);
+
+    // Ensure posts directory exists
+    const postsDir = path.join(__dirname, 'posts');
+    if (!fs.existsSync(postsDir)) fs.mkdirSync(postsDir, { recursive: true });
+
+    // Build a simple HTML post file
+    const filename = `${postMeta.slug}.html`;
+    const filepath = path.join(postsDir, filename);
+    const metaDescription = postMeta.excerpt.replace(/"/g, "'");
+    const html = `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${escapeXml(postMeta.title)}</title>
+    <meta name="description" content="${escapeXml(metaDescription)}" />
+    <meta property="og:title" content="${escapeXml(postMeta.title)}" />
+    <meta property="og:description" content="${escapeXml(metaDescription)}" />
+    <script type="application/ld+json">{ "@context": "https://schema.org", "@type": "BlogPosting", "headline": "${escapeXml(postMeta.title)}", "datePublished": "${postMeta.date}" }</script>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <article class="post">
+      <header>
+        <h1>${escapeXml(postMeta.title)}</h1>
+        <p class="meta">${new Date(postMeta.date).toLocaleString()} • ${escapeXml(postMeta.category)}</p>
+      </header>
+      <section class="content">
+        ${content}
+      </section>
+    </article>
+    <script src="/script.js" defer></script>
+  </body>
+</html>`;
+
+    fs.writeFileSync(filepath, html, 'utf8');
+
+    res.json({ success: true, id, url: `/posts/${filename}` });
+  } catch (error) {
+    console.error('Create post error:', error);
+    res.status(500).json({ error: 'Failed to save post' });
+  }
+});
+
+// Admin: delete post (remove metadata and file)
+app.delete('/api/admin/posts/:id', verifyAdmin, (req, res) => {
+  try {
+    const { id } = req.params;
+    const posts = readPosts();
+    const idx = posts.findIndex(p => p.id === id || p.slug === id);
+    if (idx === -1) return res.status(404).json({ error: 'Post not found' });
+
+    const removed = posts.splice(idx, 1)[0];
+    writePosts(posts);
+
+    const postsDir = path.join(__dirname, 'posts');
+    const filepath = path.join(postsDir, `${removed.slug}.html`);
+    if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete post error:', error);
+    res.status(500).json({ error: 'Failed to delete post' });
   }
 });
 
@@ -545,11 +667,21 @@ app.put('/api/users/profile/:id', (req, res) => {
 
 app.post('/api/admin/login', (req, res) => {
   const { password } = req.body;
-  
-  if (password === ADMIN_PASSWORD) {
-    res.json({ token: ADMIN_TOKEN });
-  } else {
-    res.status(401).json({ error: 'Invalid password' });
+  try {
+    const settingsRaw = fs.readFileSync(settingsFile, 'utf8');
+    const settings = JSON.parse(settingsRaw || '{}');
+    const stored = settings.adminPassword || ADMIN_PASSWORD;
+    if (password === stored) {
+      res.json({ token: ADMIN_TOKEN });
+    } else {
+      res.status(401).json({ error: 'Invalid password' });
+    }
+  } catch (err) {
+    if (password === ADMIN_PASSWORD) {
+      res.json({ token: ADMIN_TOKEN });
+    } else {
+      res.status(401).json({ error: 'Invalid password' });
+    }
   }
 });
 
@@ -646,17 +778,33 @@ app.get('/api/admin/subscribers/export', verifyAdmin, (req, res) => {
 
 app.post('/api/admin/settings', verifyAdmin, (req, res) => {
   try {
-    const { password } = req.body;
-    
-    if (password) {
-      // In production, store hashed password in .env or database
-      process.env.ADMIN_PASSWORD = password;
-      res.json({ success: true });
-    } else {
-      res.status(400).json({ error: 'No settings to update' });
-    }
+    const { title, description, password } = req.body;
+
+    const current = JSON.parse(fs.readFileSync(settingsFile, 'utf8') || '{}');
+    const updated = {
+      title: title || current.title || 'Essence',
+      description: description || current.description || '',
+      adminPassword: password ? password : (current.adminPassword || ADMIN_PASSWORD)
+    };
+
+    fs.writeFileSync(settingsFile, JSON.stringify(updated, null, 2), 'utf8');
+
+    // Update runtime admin password so login uses new value immediately
+    try { global.ADMIN_PASSWORD = updated.adminPassword; } catch (e) {}
+
+    res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update settings' });
+  }
+});
+
+// Admin: get current settings
+app.get('/api/admin/settings', verifyAdmin, (req, res) => {
+  try {
+    const current = JSON.parse(fs.readFileSync(settingsFile, 'utf8') || '{}');
+    res.json({ title: current.title || 'Essence', description: current.description || '', adminPassword: !!current.adminPassword });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to read settings' });
   }
 });
 

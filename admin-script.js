@@ -221,6 +221,17 @@ async function loadDashboardData() {
       document.getElementById('stat-likes').textContent = data.totalLikes || 0;
       document.getElementById('stat-subscribers').textContent = data.totalSubscribers || 0;
     }
+    // Load current settings to prefill form
+    try {
+      const sres = await fetch(`${API}/admin/settings`, { headers: { 'Authorization': `Bearer ${adminToken}` } });
+      if (sres.ok) {
+        const settings = await sres.json();
+        if (settings.title) document.getElementById('blog-title').value = settings.title;
+        if (settings.description) document.getElementById('blog-description').value = settings.description;
+      }
+    } catch (se) {
+      // ignore
+    }
   } catch (e) {
     console.log('Could not load analytics:', e.message);
     // Set defaults
