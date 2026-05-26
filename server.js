@@ -69,7 +69,8 @@ function checkRateLimit(key, maxRequests = 10, windowMs = 60000) {
 // Rate limit middleware
 function rateLimitMiddleware(req, res, next) {
   const key = `${req.method}-${req.path}-${req.ip}`;
-  if (!checkRateLimit(key, 30, 60000)) {
+  // Allow 100 requests per minute for normal browsing
+  if (!checkRateLimit(key, 100, 60000)) {
     return res.status(429).json({ error: 'Too many requests, please try again later' });
   }
   next();
@@ -1190,6 +1191,153 @@ app.delete('/api/admin/images/:filename', verifyAdmin, (req, res) => {
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete image' });
+  }
+});
+
+// ==========================================
+// ANALYTICS & STATS ENDPOINTS
+// ==========================================
+
+// Store analytics data in memory (in production, use a database)
+const analyticsStore = {
+  pageViews: [],
+  events: [],
+  sessions: new Map()
+};
+
+// Public: submit analytics
+app.post('/api/analytics', (req, res) => {
+  try {
+    const { sessionId, pageViews, events } = req.body;
+    
+    if (pageViews) {
+      analyticsStore.pageViews.push(...pageViews);
+    }
+    
+    if (events) {
+      analyticsStore.events.push(...events);
+    }
+    
+    if (sessionId) {
+      analyticsStore.sessions.set(sessionId, {
+        createdAt: new Date().toISOString(),
+        pageCount: pageViews?.length || 0,
+        eventCount: events?.length || 0
+      });
+    }
+    
+    res.json({ success: true, message: 'Analytics recorded' });
+  } catch (error) {
+    logError('Analytics', error);
+    res.status(500).json({ error: 'Failed to record analytics' });
+  }
+});
+
+// Admin: get dashboard statistics
+app.get('/api/admin/stats', verifyAdmin, (req, res) => {
+  try {
+    const posts = readPosts();
+    const comments = readComments();
+    const subscribers = readSubscribers();
+    
+    // Calculate stats
+    const stats = {
+      totalPosts: posts.length,
+      totalComments: comments.length,
+      totalSubscribers: subscribers.length,
+      totalViews: analyticsStore.pageViews.length,
+      activeSessions: analyticsStore.sessions.size,
+      viewChange: Math.floor(Math.random() * 40 - 10), // Demo data
+      recentPosts: posts.slice(0, 5),
+      recentComments: comments.slice(0, 5),
+      topCategories: getTopCategories(posts),
+      pageViewTrend: getPageViewTrend()
+    };
+    
+    res.json(stats);
+  } catch (error) {
+    logError('Admin stats', error);
+    res.status(500).json({ error: 'Failed to fetch stats' });
+  }
+});
+
+// Admin: get analytics details
+app.get('/api/admin/analytics', verifyAdmin, (req, res) => {
+  try {
+    const pageViewsByPage = {};
+    analyticsStore.pageViews.forEach(view => {
+      pageViewsByPage[view.page] = (pageViewsByPage[view.page] || 0) + 1;
+    });
+    
+    const eventsByType = {};
+    analyticsStore.events.forEach(event => {
+      eventsByType[event.name] = (eventsByType[event.name] || 0) + 1;
+    });
+    
+    res.json({
+      pageViews: analyticsStore.pageViews.length,
+      pageViewsByPage,
+      events: analyticsStore.events.length,
+      eventsByType,
+      activeSessions: analyticsStore.sessions.size,
+      topPages: Object.entries(pageViewsByPage)
+        .map(([page, count]) => ({ page, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10)
+    });
+  } catch (error) {
+    logError('Admin analytics', error);
+    res.status(500).json({ error: 'Failed to fetch analytics' });
+  }
+});
+
+// Helper: get top categories
+function getTopCategories(posts) {
+  const categories = {};
+  posts.forEach(post => {
+    if (post.category) {
+      categories[post.category] = (categories[post.category] || 0) + 1;
+    }
+  });
+  
+  return Object.entries(categories)
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+}
+
+// Helper: get page view trend (demo)
+function getPageViewTrend() {
+  const trend = [];
+  for (let i = 6; i >= 0; i--) {
+    const date = new Date();
+    date.setDate(date.getDate() - i);
+    trend.push({
+      date: date.toISOString().split('T')[0],
+      views: Math.floor(Math.random() * 100) + 20
+    });
+  }
+  return trend;
+}
+
+// Public: get related posts by category
+app.get('/api/posts/related/:category', (req, res) => {
+  try {
+    const { category } = req.params;
+    const posts = readPosts();
+    
+    const related = posts
+      .filter(p => p.category === category)
+      .slice(0, 3);
+    
+    if (related.length === 0) {
+      return res.json(posts.slice(0, 3)); // Return random posts if no related found
+    }
+    
+    res.json(related);
+  } catch (error) {
+    logError('Related posts', error);
+    res.status(500).json({ error: 'Failed to fetch related posts' });
   }
 });
 

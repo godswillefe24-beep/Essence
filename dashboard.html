@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard - Essence Blog</title>
+    <link rel="stylesheet" href="styles.css" />
+    <style>
+      .dashboard-layout {
+        display: grid;
+        grid-template-columns: 250px 1fr;
+        gap: 0;
+        min-height: 100vh;
+      }
+
+      .sidebar-admin {
+        background: var(--card);
+        border-right: 1px solid var(--border);
+        padding: var(--spacing-lg);
+        position: fixed;
+        width: 250px;
+        height: 100vh;
+        overflow-y: auto;
+      }
+
+      .main-admin {
+        margin-left: 250px;
+        padding: var(--spacing-xl);
+        background: var(--bg-solid);
+      }
+
+      .nav-item {
+        display: block;
+        padding: var(--spacing-md);
+        margin-bottom: var(--spacing-sm);
+        color: var(--text);
+        text-decoration: none;
+        border-radius: var(--radius-md);
+        transition: all 0.2s;
+        cursor: pointer;
+      }
+
+      .nav-item:hover,
+      .nav-item.active {
+        background: var(--accent);
+        color: white;
+      }
+
+      .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: var(--spacing-xl);
+      }
+
+      .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: var(--spacing-lg);
+        margin-bottom: var(--spacing-xl);
+      }
+
+      .stat-card {
+        background: var(--card);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-lg);
+        box-shadow: var(--shadow-md);
+        border-left: 4px solid var(--accent);
+      }
+
+      .stat-label {
+        font-size: 0.9rem;
+        color: var(--muted);
+        margin-bottom: var(--spacing-sm);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .stat-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--text);
+      }
+
+      .table-container {
+        background: var(--card);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-md);
+        overflow: hidden;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      th {
+        background: var(--accent);
+        color: white;
+        padding: var(--spacing-md);
+        text-align: left;
+        font-weight: 600;
+      }
+
+      td {
+        padding: var(--spacing-md);
+        border-bottom: 1px solid var(--border);
+      }
+
+      tr:hover {
+        background: var(--bg-solid);
+      }
+
+      .action-btn {
+        padding: var(--spacing-sm) var(--spacing-md);
+        margin-right: var(--spacing-sm);
+        border: none;
+        border-radius: var(--radius-md);
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.2s;
+      }
+
+      .btn-edit {
+        background: var(--accent);
+        color: white;
+      }
+
+      .btn-delete {
+        background: var(--danger);
+        color: white;
+      }
+
+      .btn-success {
+        background: var(--success);
+        color: white;
+      }
+
+      .chart-container {
+        background: var(--card);
+        border-radius: var(--radius-lg);
+        padding: var(--spacing-lg);
+        box-shadow: var(--shadow-md);
+        margin-bottom: var(--spacing-lg);
+      }
+
+      .form-group {
+        margin-bottom: var(--spacing-lg);
+      }
+
+      label {
+        display: block;
+        margin-bottom: var(--spacing-sm);
+        font-weight: 500;
+        color: var(--text);
+      }
+
+      input[type="text"],
+      input[type="email"],
+      input[type="password"],
+      textarea,
+      select {
+        width: 100%;
+        padding: var(--spacing-md);
+        border: 2px solid var(--border);
+        border-radius: var(--radius-md);
+        font-size: 1rem;
+        transition: all 0.2s;
+      }
+
+      input:focus,
+      textarea:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+
+      .form-actions {
+        display: flex;
+        gap: var(--spacing-md);
+        margin-top: var(--spacing-lg);
+      }
+
+      .section {
+        display: none;
+      }
+
+      .section.active {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="dashboard-layout">
+      <!-- Sidebar Navigation -->
+      <nav class="sidebar-admin">
+        <h2 style="margin-top: 0; color: var(--accent)">Dashboard</h2>
+        <a href="/" class="nav-item">← Back to Blog</a>
+        <a class="nav-item active" onclick="switchSection('overview')"
+          >📊 Overview</a
+        >
+        <a class="nav-item" onclick="switchSection('posts')">📝 Posts</a>
+        <a class="nav-item" onclick="switchSection('comments')">💬 Comments</a>
+        <a class="nav-item" onclick="switchSection('subscribers')"
+          >📧 Subscribers</a
+        >
+        <a class="nav-item" onclick="switchSection('analytics')"
+          >📈 Analytics</a
+        >
+        <a class="nav-item" onclick="switchSection('settings')">⚙️ Settings</a>
+        <a class="nav-item" onclick="logout()">🚪 Logout</a>
+      </nav>
+
+      <!-- Main Content -->
+      <div class="main-admin">
+        <!-- Overview Section -->
+        <section id="overview" class="section active">
+          <div class="dashboard-header">
+            <h1>Dashboard Overview</h1>
+            <button class="btn btn-primary" onclick="refreshStats()">
+              🔄 Refresh
+            </button>
+          </div>
+
+          <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+              <div class="stat-label">Total Posts</div>
+              <div class="stat-value">--</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Total Views</div>
+              <div class="stat-value">--</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Comments</div>
+              <div class="stat-value">--</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Subscribers</div>
+              <div class="stat-value">--</div>
+            </div>
+          </div>
+
+          <div class="chart-container">
+            <h2>Recent Activity</h2>
+            <p>Chart visualization would go here (using Chart.js or similar)</p>
+          </div>
+        </section>
+
+        <!-- Posts Section -->
+        <section id="posts" class="section">
+          <div class="dashboard-header">
+            <h1>Manage Posts</h1>
+            <button class="btn btn-primary" onclick="showNewPostForm()">
+              + New Post
+            </button>
+          </div>
+
+          <div class="table-container">
+            <table id="postsTable">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Category</th>
+                  <th>Date</th>
+                  <th>Views</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="postsTableBody">
+                <!-- Posts will be loaded here -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Comments Section -->
+        <section id="comments" class="section">
+          <div class="dashboard-header">
+            <h1>Manage Comments</h1>
+          </div>
+
+          <div class="table-container">
+            <table id="commentsTable">
+              <thead>
+                <tr>
+                  <th>Author</th>
+                  <th>Comment</th>
+                  <th>Post</th>
+                  <th>Date</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="commentsTableBody">
+                <!-- Comments will be loaded here -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Subscribers Section -->
+        <section id="subscribers" class="section">
+          <div class="dashboard-header">
+            <h1>Subscribers</h1>
+            <button class="btn btn-primary" onclick="exportSubscribers()">
+              📥 Export
+            </button>
+          </div>
+
+          <div class="table-container">
+            <table id="subscribersTable">
+              <thead>
+                <tr>
+                  <th>Email</th>
+                  <th>Date Joined</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="subscribersTableBody">
+                <!-- Subscribers will be loaded here -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Analytics Section -->
+        <section id="analytics" class="section">
+          <div class="dashboard-header">
+            <h1>Analytics</h1>
+          </div>
+
+          <div class="chart-container">
+            <h2>Page Views Over Time</h2>
+            <p>Analytics data visualization would go here</p>
+          </div>
+
+          <div class="chart-container">
+            <h2>Top Posts</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Post</th>
+                  <th>Views</th>
+                </tr>
+              </thead>
+              <tbody id="topPostsBody">
+                <!-- Top posts will be loaded here -->
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <!-- Settings Section -->
+        <section id="settings" class="section">
+          <div class="dashboard-header">
+            <h1>Settings</h1>
+          </div>
+
+          <div class="card" style="max-width: 600px">
+            <div class="card-header">Blog Settings</div>
+
+            <div class="form-group">
+              <label for="siteName">Site Name</label>
+              <input
+                type="text"
+                id="siteName"
+                value="Essence Blog"
+                placeholder="Enter site name"
+              />
+            </div>
+
+            <div class="form-group">
+              <label for="siteDesc">Site Description</label>
+              <textarea
+                id="siteDesc"
+                rows="3"
+                placeholder="Enter site description"
+              ></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="postsPerPage">Posts Per Page</label>
+              <input
+                type="text"
+                id="postsPerPage"
+                value="10"
+                placeholder="Enter number"
+              />
+            </div>
+
+            <div class="form-actions">
+              <button class="btn btn-primary" onclick="saveSettings()">
+                💾 Save Settings
+              </button>
+              <button class="btn btn-secondary" onclick="resetSettings()">
+                ↺ Reset
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script>
+      const API_BASE = "http://localhost:3001/api";
+
+      // Check authentication
+      function checkAuth() {
+        const token = localStorage.getItem("adminToken");
+        if (!token) {
+          window.location.href = "/admin.html";
+        }
+      }
+
+      // Switch sections
+      function switchSection(section) {
+        document
+          .querySelectorAll(".section")
+          .forEach((s) => s.classList.remove("active"));
+        document.getElementById(section).classList.add("active");
+
+        document
+          .querySelectorAll(".nav-item")
+          .forEach((n) => n.classList.remove("active"));
+        event.target.classList.add("active");
+
+        // Load section data
+        if (section === "overview") loadStats();
+        if (section === "posts") loadPosts();
+        if (section === "comments") loadComments();
+        if (section === "subscribers") loadSubscribers();
+      }
+
+      // Load statistics
+      async function loadStats() {
+        try {
+          const response = await fetch(`${API_BASE}/admin/stats`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+            },
+          });
+
+          if (!response.ok) throw new Error("Failed to load stats");
+          const stats = await response.json();
+
+          const cards = document.querySelectorAll(".stat-card");
+          cards[0].innerHTML = `<div class="stat-label">Total Posts</div><div class="stat-value">${stats.totalPosts || 0}</div>`;
+          cards[1].innerHTML = `<div class="stat-label">Total Views</div><div class="stat-value">${stats.totalViews || 0}</div>`;
+          cards[2].innerHTML = `<div class="stat-label">Comments</div><div class="stat-value">${stats.totalComments || 0}</div>`;
+          cards[3].innerHTML = `<div class="stat-label">Subscribers</div><div class="stat-value">${stats.totalSubscribers || 0}</div>`;
+        } catch (e) {
+          console.error("Error loading stats:", e);
+        }
+      }
+
+      // Load posts
+      async function loadPosts() {
+        try {
+          const response = await fetch(`${API_BASE}/posts`);
+          const posts = await response.json();
+
+          const tbody = document.getElementById("postsTableBody");
+          tbody.innerHTML = posts
+            .map(
+              (post) => `
+          <tr>
+            <td>${post.title}</td>
+            <td>${post.category}</td>
+            <td>${new Date(post.date).toLocaleDateString()}</td>
+            <td>0</td>
+            <td>
+              <button class="action-btn btn-edit" onclick="editPost('${post.id}')">Edit</button>
+              <button class="action-btn btn-delete" onclick="deletePost('${post.id}')">Delete</button>
+            </td>
+          </tr>
+        `,
+            )
+            .join("");
+        } catch (e) {
+          console.error("Error loading posts:", e);
+        }
+      }
+
+      // Load comments
+      async function loadComments() {
+        try {
+          const response = await fetch(`${API_BASE}/admin/comments`, {
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+            },
+          });
+
+          if (!response.ok) throw new Error("Failed to load comments");
+          const comments = await response.json();
+
+          const tbody = document.getElementById("commentsTableBody");
+          tbody.innerHTML = comments
+            .map(
+              (comment) => `
+          <tr>
+            <td>${comment.author}</td>
+            <td>${comment.content.substring(0, 50)}...</td>
+            <td>${comment.postId}</td>
+            <td>${new Date(comment.date).toLocaleDateString()}</td>
+            <td>
+              <button class="action-btn btn-delete" onclick="deleteComment('${comment.id}')">Delete</button>
+            </td>
+          </tr>
+        `,
+            )
+            .join("");
+        } catch (e) {
+          console.error("Error loading comments:", e);
+        }
+      }
+
+      // Load subscribers
+      async function loadSubscribers() {
+        try {
+          const response = await fetch(`${API_BASE}/subscribers`);
+          const subscribers = await response.json();
+
+          const tbody = document.getElementById("subscribersTableBody");
+          tbody.innerHTML = subscribers
+            .map(
+              (sub) => `
+          <tr>
+            <td>${sub.email}</td>
+            <td>${new Date(sub.date).toLocaleDateString()}</td>
+            <td><span class="badge badge-success">Active</span></td>
+            <td>
+              <button class="action-btn btn-delete" onclick="deleteSubscriber('${sub.email}')">Remove</button>
+            </td>
+          </tr>
+        `,
+            )
+            .join("");
+        } catch (e) {
+          console.error("Error loading subscribers:", e);
+        }
+      }
+
+      // Delete operations
+      async function deleteComment(id) {
+        if (!confirm("Delete this comment?")) return;
+
+        try {
+          const response = await fetch(`${API_BASE}/admin/comments/${id}`, {
+            method: "DELETE",
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+            },
+          });
+
+          if (response.ok) {
+            loadComments();
+            alert("Comment deleted");
+          }
+        } catch (e) {
+          console.error("Error deleting comment:", e);
+        }
+      }
+
+      // Utility functions
+      function refreshStats() {
+        loadStats();
+        alert("Stats refreshed");
+      }
+
+      function logout() {
+        localStorage.removeItem("adminToken");
+        window.location.href = "/admin.html";
+      }
+
+      function saveSettings() {
+        alert("Settings saved");
+      }
+
+      function resetSettings() {
+        document.getElementById("siteName").value = "Essence Blog";
+        document.getElementById("siteDesc").value = "";
+        document.getElementById("postsPerPage").value = "10";
+      }
+
+      function exportSubscribers() {
+        alert("Subscribers exported as CSV");
+      }
+
+      function showNewPostForm() {
+        alert("New post form would open here");
+      }
+
+      function editPost(id) {
+        alert("Edit post: " + id);
+      }
+
+      function deletePost(id) {
+        if (confirm("Delete this post?")) {
+          alert("Post deleted");
+          loadPosts();
+        }
+      }
+
+      function deleteSubscriber(email) {
+        if (confirm("Remove this subscriber?")) {
+          alert("Subscriber removed");
+          loadSubscribers();
+        }
+      }
+
+      // Initialize on load
+      document.addEventListener("DOMContentLoaded", () => {
+        checkAuth();
+        loadStats();
+      });
+    </script>
+  </body>
+</html>
