@@ -1,5 +1,5 @@
-const API = "http://localhost:3001/api";
-const PASSWORD = "admin123";
+const API = `${window.location.origin}/api`;
+const PASSWORD = "";
 
 let isLoggedIn = false;
 let adminToken = null;
@@ -14,14 +14,14 @@ let logoutBtn;
 // Initialize
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Admin dashboard loaded");
-  
+
   // Initialize DOM elements after DOM is ready
   loginContainer = document.getElementById("login-container");
   dashboard = document.getElementById("dashboard");
   loginForm = document.getElementById("login-form");
   passwordInput = document.getElementById("password");
   logoutBtn = document.getElementById("logout-btn");
-  
+
   setupEventListeners();
 });
 
@@ -385,14 +385,15 @@ async function loadSubscribers() {
     });
     if (response.ok) {
       const data = await response.json();
-      const subscribers = Array.isArray(data) ? data : (data.subscribers || []);
+      const subscribers = Array.isArray(data) ? data : data.subscribers || [];
       const container = document.getElementById("subscribers-list");
-      
+
       if (subscribers.length === 0) {
-        container.innerHTML = "<p style=\"text-align: center; padding: 20px;\">No subscribers yet</p>";
+        container.innerHTML =
+          '<p style="text-align: center; padding: 20px;">No subscribers yet</p>';
         return;
       }
-      
+
       container.innerHTML = subscribers
         .map(
           (sub) => `
@@ -409,7 +410,8 @@ async function loadSubscribers() {
         )
         .join("");
     } else {
-      document.getElementById("subscribers-list").innerHTML = "<p>Failed to load subscribers</p>";
+      document.getElementById("subscribers-list").innerHTML =
+        "<p>Failed to load subscribers</p>";
     }
   } catch (e) {
     console.log("Could not load subscribers:", e.message);
@@ -437,8 +439,6 @@ async function deleteSubscriber(subscriberId) {
     console.error("Delete error:", error);
     alert("Error removing subscriber");
   }
-}
-  });
 }
 
 console.log("Admin script ready");

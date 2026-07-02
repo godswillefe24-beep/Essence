@@ -1,176 +1,172 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Admin - Subscribers</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <main class="container admin-container">
-      <h1>Admin — Subscribers</h1>
 
-      <div class="admin-login">
-        <input
-          id="admin-password"
-          type="password"
-          placeholder="Admin password"
-        />
-        <button id="admin-login-btn" class="btn">Login</button>
-        <button id="admin-logout-btn" class="btn hidden">Logout</button>
-        <button id="export-subs-btn" class="btn hidden">Export CSV</button>
-        <div
-          id="login-message"
-          style="margin-top: 8px; color: var(--muted)"
-        ></div>
-      </div>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Admin - Subscribers</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
 
-      <section id="subscribers-section" class="hidden">
-        <h2>Subscribers</h2>
-        <div id="subscribers-list">Loading...</div>
-      </section>
-    </main>
+<body>
+  <main class="container admin-container">
+    <h1>Admin — Subscribers</h1>
 
-    <script>
-      const API_BASE = "http://localhost:3001/api";
-      let adminToken = null;
+    <div class="admin-login">
+      <input id="admin-password" type="password" placeholder="Admin password" />
+      <button id="admin-login-btn" class="btn">Login</button>
+      <button id="admin-logout-btn" class="btn hidden">Logout</button>
+      <button id="export-subs-btn" class="btn hidden">Export CSV</button>
+      <div id="login-message" style="margin-top: 8px; color: var(--muted)"></div>
+    </div>
 
-      const loginBtn = document.getElementById("admin-login-btn");
-      const logoutBtn = document.getElementById("admin-logout-btn");
-      const passInput = document.getElementById("admin-password");
-      const message = document.getElementById("login-message");
-      const subsSection = document.getElementById("subscribers-section");
-      const subsList = document.getElementById("subscribers-list");
+    <section id="subscribers-section" class="hidden">
+      <h2>Subscribers</h2>
+      <div id="subscribers-list">Loading...</div>
+    </section>
+  </main>
 
-      function setLoggedIn(token) {
-        adminToken = token;
-        localStorage.setItem("admin_token", token);
-        subsSection.classList.remove("hidden");
-        logoutBtn.classList.remove("hidden");
-        loginBtn.classList.add("hidden");
-        passInput.classList.add("hidden");
-        message.textContent = "";
-        loadSubscribers();
+  <script>
+    const API_BASE = `${window.location.origin}/api`;
+    let adminToken = null;
+
+    const loginBtn = document.getElementById("admin-login-btn");
+    const logoutBtn = document.getElementById("admin-logout-btn");
+    const passInput = document.getElementById("admin-password");
+    const message = document.getElementById("login-message");
+    const subsSection = document.getElementById("subscribers-section");
+    const subsList = document.getElementById("subscribers-list");
+
+    function setLoggedIn(token) {
+      adminToken = token;
+      localStorage.setItem("admin_token", token);
+      subsSection.classList.remove("hidden");
+      logoutBtn.classList.remove("hidden");
+      loginBtn.classList.add("hidden");
+      passInput.classList.add("hidden");
+      message.textContent = "";
+      loadSubscribers();
+    }
+
+    function setLoggedOut() {
+      adminToken = null;
+      localStorage.removeItem("admin_token");
+      subsSection.classList.add("hidden");
+      logoutBtn.classList.add("hidden");
+      loginBtn.classList.remove("hidden");
+      passInput.classList.remove("hidden");
+      subsList.innerHTML = "";
+    }
+
+    loginBtn.addEventListener("click", async () => {
+      const password = passInput.value.trim();
+      if (!password) {
+        message.textContent = "Enter admin password";
+        return;
       }
+      message.textContent = "Logging in...";
 
-      function setLoggedOut() {
-        adminToken = null;
-        localStorage.removeItem("admin_token");
-        subsSection.classList.add("hidden");
-        logoutBtn.classList.add("hidden");
-        loginBtn.classList.remove("hidden");
-        passInput.classList.remove("hidden");
-        subsList.innerHTML = "";
-      }
-
-      loginBtn.addEventListener("click", async () => {
-        const password = passInput.value.trim();
-        if (!password) {
-          message.textContent = "Enter admin password";
-          return;
+      try {
+        const res = await fetch(`${API_BASE}/admin/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ password }),
+        });
+        const data = await res.json();
+        if (res.ok && data.token) {
+          setLoggedIn(data.token);
+        } else {
+          message.textContent = data.error || "Login failed";
         }
-        message.textContent = "Logging in...";
+      } catch (err) {
+        message.textContent = "Server error";
+      }
+    });
 
+    logoutBtn.addEventListener("click", () => setLoggedOut());
+
+    document
+      .getElementById("export-subs-btn")
+      .addEventListener("click", async () => {
+        if (!adminToken) return alert("Not authenticated");
         try {
-          const res = await fetch(`${API_BASE}/admin/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ password }),
+          const res = await fetch(`${API_BASE}/admin/subscribers/export`, {
+            headers: { Authorization: `Bearer ${adminToken}` },
           });
-          const data = await res.json();
-          if (res.ok && data.token) {
-            setLoggedIn(data.token);
-          } else {
-            message.textContent = data.error || "Login failed";
-          }
+          if (!res.ok) return alert("Export failed");
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "subscribers.csv";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
         } catch (err) {
-          message.textContent = "Server error";
+          alert("Export failed");
         }
       });
 
-      logoutBtn.addEventListener("click", () => setLoggedOut());
-
-      document
-        .getElementById("export-subs-btn")
-        .addEventListener("click", async () => {
-          if (!adminToken) return alert("Not authenticated");
-          try {
-            const res = await fetch(`${API_BASE}/admin/subscribers/export`, {
-              headers: { Authorization: `Bearer ${adminToken}` },
-            });
-            if (!res.ok) return alert("Export failed");
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = "subscribers.csv";
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(url);
-          } catch (err) {
-            alert("Export failed");
-          }
+    async function loadSubscribers() {
+      subsList.innerHTML = "Loading...";
+      try {
+        const res = await fetch(`${API_BASE}/admin/subscribers`, {
+          headers: { Authorization: `Bearer ${adminToken}` },
         });
+        if (!res.ok) {
+          subsList.innerHTML = "Failed to load subscribers";
+          return;
+        }
+        const list = await res.json();
+        if (list.length === 0) {
+          subsList.innerHTML = "<p>No subscribers yet.</p>";
+          return;
+        }
 
-      async function loadSubscribers() {
-        subsList.innerHTML = "Loading...";
-        try {
-          const res = await fetch(`${API_BASE}/admin/subscribers`, {
-            headers: { Authorization: `Bearer ${adminToken}` },
-          });
-          if (!res.ok) {
-            subsList.innerHTML = "Failed to load subscribers";
-            return;
-          }
-          const list = await res.json();
-          if (list.length === 0) {
-            subsList.innerHTML = "<p>No subscribers yet.</p>";
-            return;
-          }
-
-          subsList.innerHTML = list
-            .map(
-              (s) => `
+        subsList.innerHTML = list
+          .map(
+            (s) => `
           <div class="subscriber-row">
             <div><strong>${s.email}</strong></div>
             <div style="color:var(--muted);">${s.date}</div>
             <div><button data-id="${s.id}" class="btn delete-subscriber">Delete</button></div>
           </div>
         `,
-            )
-            .join("");
+          )
+          .join("");
 
-          document.querySelectorAll(".delete-subscriber").forEach((btn) => {
-            btn.addEventListener("click", async () => {
-              const id = btn.dataset.id;
-              if (!confirm("Delete subscriber?")) return;
-              try {
-                const res = await fetch(`${API_BASE}/admin/subscribers/${id}`, {
-                  method: "DELETE",
-                  headers: { Authorization: `Bearer ${adminToken}` },
-                });
-                if (res.ok) {
-                  loadSubscribers();
-                } else {
-                  alert("Failed to delete");
-                }
-              } catch (err) {
-                alert("Server error");
+        document.querySelectorAll(".delete-subscriber").forEach((btn) => {
+          btn.addEventListener("click", async () => {
+            const id = btn.dataset.id;
+            if (!confirm("Delete subscriber?")) return;
+            try {
+              const res = await fetch(`${API_BASE}/admin/subscribers/${id}`, {
+                method: "DELETE",
+                headers: { Authorization: `Bearer ${adminToken}` },
+              });
+              if (res.ok) {
+                loadSubscribers();
+              } else {
+                alert("Failed to delete");
               }
-            });
+            } catch (err) {
+              alert("Server error");
+            }
           });
-        } catch (err) {
-          subsList.innerHTML = "Error loading subscribers";
-        }
+        });
+      } catch (err) {
+        subsList.innerHTML = "Error loading subscribers";
       }
+    }
 
-      // Auto-login if token saved
-      const saved = localStorage.getItem("admin_token");
-      if (saved) {
-        adminToken = saved;
-        setLoggedIn(saved);
-      }
-    </script>
-  </body>
+    // Auto-login if token saved
+    const saved = localStorage.getItem("admin_token");
+    if (saved) {
+      adminToken = saved;
+      setLoggedIn(saved);
+    }
+  </script>
+</body>
+
 </html>

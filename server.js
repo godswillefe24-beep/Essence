@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import { dirname } from "path";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import { v4 as uuidv4 } from "uuid";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
@@ -13,7 +14,26 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-const PORT = 3001;
+const PORT = Number(process.env.PORT || 3001);
+
+function loadEnvFile() {
+  const envFile = path.join(__dirname, ".env");
+  if (!fs.existsSync(envFile)) return;
+
+  const lines = fs.readFileSync(envFile, "utf8").split(/\r?\n/);
+  lines.forEach((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) return;
+
+    const [key, ...rest] = trimmed.split("=");
+    const value = rest.join("=").trim();
+    if (!process.env[key]) {
+      process.env[key] = value.replace(/^['"]|['"]$/g, "");
+    }
+  });
+}
+
+loadEnvFile();
 
 // Middleware
 app.use(cors());
@@ -92,7 +112,7 @@ const settingsFile = path.join(__dirname, "data", "settings.json");
 
 // JWT Secret
 const JWT_SECRET =
-  process.env.JWT_SECRET || "your-secret-key-change-in-production";
+  process.env.JWT_SECRET || crypto.randomBytes(32).toString("hex");
 
 // Initialize data directory
 const dataDir = path.join(__dirname, "data");
@@ -135,7 +155,8 @@ function initializeDataFiles() {
         {
           title: "Essence",
           description: "A modern blog",
-          adminPassword: process.env.ADMIN_PASSWORD || "admin123",
+          adminPassword:
+            process.env.ADMIN_PASSWORD || "change-this-to-a-strong-password",
         },
         null,
         2,
@@ -334,6 +355,15 @@ function readPosts() {
 
 function writePosts(list) {
   fs.writeFileSync(postsFile, JSON.stringify(list, null, 2));
+}
+
+function readComments() {
+  try {
+    const raw = fs.readFileSync(commentsFile, "utf8");
+    return JSON.parse(raw || "[]");
+  } catch (err) {
+    return [];
+  }
 }
 
 // Public: list posts metadata
@@ -720,8 +750,20 @@ app.post("/api/subscribe", async (req, res) => {
 });
 
 // Start server
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
 const ADMIN_TOKEN = "essence-admin-token-2026";
+
+function getAdminPassword() {
+  try {
+    const current = JSON.parse(fs.readFileSync(settingsFile, "utf8") || "{}");
+    return (
+      current.adminPassword ||
+      process.env.ADMIN_PASSWORD ||
+      "change-this-to-a-strong-password"
+    );
+  } catch {
+    return process.env.ADMIN_PASSWORD || "change-this-to-a-strong-password";
+  }
+}
 
 // ==========================================
 // USER AUTHENTICATION
@@ -957,14 +999,14 @@ app.post("/api/admin/login", (req, res) => {
   try {
     const settingsRaw = fs.readFileSync(settingsFile, "utf8");
     const settings = JSON.parse(settingsRaw || "{}");
-    const stored = settings.adminPassword || ADMIN_PASSWORD;
+    const stored = settings.adminPassword || getAdminPassword();
     if (password === stored) {
       res.json({ token: ADMIN_TOKEN });
     } else {
       res.status(401).json({ error: "Invalid password" });
     }
   } catch (err) {
-    if (password === ADMIN_PASSWORD) {
+    if (password === getAdminPassword()) {
       res.json({ token: ADMIN_TOKEN });
     } else {
       res.status(401).json({ error: "Invalid password" });
@@ -1056,7 +1098,7 @@ app.post("/api/admin/settings", verifyAdmin, (req, res) => {
       description: description || current.description || "",
       adminPassword: password
         ? password
-        : current.adminPassword || ADMIN_PASSWORD,
+        : current.adminPassword || getAdminPassword(),
     };
 
     fs.writeFileSync(settingsFile, JSON.stringify(updated, null, 2), "utf8");
@@ -1319,5 +1361,4 @@ app.get("/api/posts/related/:category", (req, res) => {
 app.listen(PORT, () => {
   console.log(`Blog server running on http://localhost:${PORT}`);
   console.log(`Admin dashboard: http://localhost:${PORT}/admin.html`);
-  console.log(`Default admin password: ${ADMIN_PASSWORD}`);
 });

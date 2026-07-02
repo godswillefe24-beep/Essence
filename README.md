@@ -9,40 +9,47 @@
 ✅ Analytics tracking (views, likes, subscribers)  
 ✅ Dark mode toggle  
 ✅ Responsive design  
-✅ Search and filter posts  
+✅ Search and filter posts
 
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - Node.js (v16 or higher)
 - npm
 
 ### Installation
 
 1. **Install dependencies:**
+
    ```bash
    npm install
    ```
 
-2. **Configure email (optional):**
+2. **Configure environment variables (recommended):**
    - Create a `.env` file from `.env.example`
-   - Add your Gmail credentials (requires App Password)
+   - Add your Gmail credentials (requires App Password) or other integrations
+   - Set a strong admin password and a random JWT secret
+
    ```bash
-   cp .env.example .env
+   copy .env.example .env
    ```
 
 3. **Start the backend server:**
+
    ```bash
    npm start
    ```
-   Server runs on `http://localhost:3001`
+
+   Server runs on `http://localhost:3001` by default (or the port from your `PORT` environment variable).
 
 4. **Open in browser:**
-   - Navigate to `http://localhost:3001` in your browser
+   - Navigate to your local blog URL in your browser
 
 ### Development Mode
 
 Run the server in watch mode (auto-restarts on changes):
+
 ```bash
 npm run dev
 ```
@@ -72,6 +79,7 @@ my-blog/
 ## 🔧 API Endpoints
 
 ### Comments
+
 - `GET /api/comments/:postId` - Get comments for a post
 - `POST /api/comments` - Post new comment
   ```json
@@ -79,11 +87,13 @@ my-blog/
   ```
 
 ### Analytics
+
 - `GET /api/analytics` - Get blog analytics
 - `POST /api/analytics/view/:postId` - Record post view
 - `POST /api/analytics/like` - Record a like
 
 ### Subscribe
+
 - `POST /api/subscribe` - Subscribe to newsletter
   ```json
   { "email": "user@example.com" }
@@ -103,6 +113,7 @@ If email isn't configured, subscriptions still work - they just won't send confi
 ## 🗄️ Database
 
 The app uses JSON files for data storage in the `data/` directory:
+
 - `comments.json` - All comments by post
 - `analytics.json` - Views, likes, total comments
 - `subscribers.json` - Email list
@@ -121,17 +132,20 @@ Data persists between server restarts.
 ## 🌐 Deployment
 
 ### Static Hosting (Netlify, Vercel, GitHub Pages)
+
 The frontend works as static HTML. Just upload `index.html`, `styles.css`, and `posts/` folder.
 
 ### Full Stack Deployment (with backend)
 
 **Heroku Example:**
+
 ```bash
 heroku create my-blog
 git push heroku main
 ```
 
 **Railway, Render, or other platforms:**
+
 1. Push code to Git repository
 2. Connect to deployment platform
 3. Set environment variables (EMAIL_USER, EMAIL_PASSWORD)
@@ -154,22 +168,26 @@ git push heroku main
 ## 🐛 Troubleshooting
 
 **"Cannot find module 'express'"**
+
 ```bash
 npm install
 ```
 
 **"API not available" in browser**
+
 - Make sure server is running: `npm start`
-- Check http://localhost:3001 loads
+- Check your local blog URL loads
 - Check browser console for CORS errors
 
 **Email not sending**
+
 - Check `.env` configuration
 - Verify Gmail App Password (not regular password)
 - Check spam folder
 
 **Port 3001 already in use**
 Edit server.js:
+
 ```javascript
 const PORT = 3002; // Change to another port
 ```

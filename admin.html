@@ -1,164 +1,154 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Essence Admin Dashboard</title>
-    <link rel="stylesheet" href="admin-styles.css" />
-  </head>
-  <body>
-    <!-- Login Screen -->
-    <div id="login-container" class="screen">
-      <div class="login-box">
-        <h1>Essence Admin</h1>
-        <p>Secure Dashboard</p>
-        <form id="login-form">
-          <input
-            type="password"
-            id="password"
-            placeholder="Enter admin password"
-            required
-          />
-          <button type="submit" class="btn">Login</button>
-        </form>
-        <small>Password: admin123</small>
-      </div>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Essence Admin Dashboard</title>
+  <link rel="stylesheet" href="admin-styles.css" />
+</head>
+
+<body>
+  <!-- Login Screen -->
+  <div id="login-container" class="screen">
+    <div class="login-box">
+      <h1>Essence Admin</h1>
+      <p>Secure Dashboard</p>
+      <form id="login-form">
+        <input type="password" id="password" placeholder="Enter admin password" required />
+        <button type="submit" class="btn">Login</button>
+      </form>
+      <small>Use the configured admin password from the server settings.</small>
     </div>
+  </div>
 
-    <!-- Dashboard Screen -->
-    <div id="dashboard" class="screen hidden">
-      <!-- Sidebar -->
-      <aside class="sidebar">
-        <div class="sidebar-brand">Essence</div>
-        <nav class="sidebar-nav">
-          <button class="nav-btn active" data-section="overview">
-            📊 Overview
-          </button>
-          <button class="nav-btn" data-section="posts">📝 Posts</button>
-          <button class="nav-btn" data-section="comments">💬 Comments</button>
-          <button class="nav-btn" data-section="subscribers">
-            📧 Subscribers
-          </button>
-          <button class="nav-btn" data-section="settings">⚙️ Settings</button>
-        </nav>
-        <button id="logout-btn" class="btn btn-logout">Logout</button>
-      </aside>
+  <!-- Dashboard Screen -->
+  <div id="dashboard" class="screen hidden">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">Essence</div>
+      <nav class="sidebar-nav">
+        <button class="nav-btn active" data-section="overview">
+          📊 Overview
+        </button>
+        <button class="nav-btn" data-section="posts">📝 Posts</button>
+        <button class="nav-btn" data-section="comments">💬 Comments</button>
+        <button class="nav-btn" data-section="subscribers">
+          📧 Subscribers
+        </button>
+        <button class="nav-btn" data-section="settings">⚙️ Settings</button>
+      </nav>
+      <button id="logout-btn" class="btn btn-logout">Logout</button>
+    </aside>
 
-      <!-- Main Content -->
-      <main class="main-content">
-        <!-- Overview Section -->
-        <section id="overview" class="section active">
-          <h1>Dashboard Overview</h1>
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-number" id="stat-posts">0</div>
-              <div class="stat-label">Posts</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-number" id="stat-comments">0</div>
-              <div class="stat-label">Comments</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-number" id="stat-likes">0</div>
-              <div class="stat-label">Likes</div>
-            </div>
-            <div class="stat-card">
-              <div class="stat-number" id="stat-subscribers">0</div>
-              <div class="stat-label">Subscribers</div>
-            </div>
+    <!-- Main Content -->
+    <main class="main-content">
+      <!-- Overview Section -->
+      <section id="overview" class="section active">
+        <h1>Dashboard Overview</h1>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-number" id="stat-posts">0</div>
+            <div class="stat-label">Posts</div>
           </div>
-        </section>
-
-        <!-- Posts Section -->
-        <section id="posts" class="section">
-          <div class="section-header">
-            <h1>Manage Posts</h1>
-            <button id="new-post-btn" class="btn">+ New Post</button>
+          <div class="stat-card">
+            <div class="stat-number" id="stat-comments">0</div>
+            <div class="stat-label">Comments</div>
           </div>
-          <div id="posts-list" class="list"></div>
-        </section>
-
-        <!-- Comments Section -->
-        <section id="comments" class="section">
-          <h1>Moderate Comments</h1>
-          <div id="comments-list" class="list"></div>
-        </section>
-
-        <!-- Subscribers Section -->
-        <section id="subscribers" class="section">
-          <h1>Email Subscribers</h1>
-          <div id="subscribers-list" class="list"></div>
-        </section>
-
-        <!-- Settings Section -->
-        <section id="settings" class="section">
-          <h1>Settings</h1>
-          <div class="settings-card">
-            <div class="form-group">
-              <label>Blog Title</label>
-              <input type="text" id="blog-title" placeholder="Blog Title" />
-            </div>
-            <div class="form-group">
-              <label>Blog Description</label>
-              <textarea
-                id="blog-description"
-                rows="3"
-                placeholder="Blog Description"
-              ></textarea>
-            </div>
-            <div class="form-group">
-              <label>Admin Password</label>
-              <input
-                type="password"
-                id="new-password"
-                placeholder="New Password (leave empty to keep)"
-              />
-            </div>
-            <button id="save-settings-btn" class="btn">Save Settings</button>
+          <div class="stat-card">
+            <div class="stat-number" id="stat-likes">0</div>
+            <div class="stat-label">Likes</div>
           </div>
-        </section>
-      </main>
-    </div>
-
-    <!-- Post Modal -->
-    <div id="post-modal" class="modal hidden">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2 id="modal-title">New Post</h2>
-          <button class="modal-close">&times;</button>
+          <div class="stat-card">
+            <div class="stat-number" id="stat-subscribers">0</div>
+            <div class="stat-label">Subscribers</div>
+          </div>
         </div>
-        <form id="post-form">
-          <input type="hidden" id="edit-post-id" value="" />
-          <div class="form-group">
-            <label>Title</label>
-            <input type="text" id="post-title" required />
-          </div>
-          <div class="form-group">
-            <label>Category</label>
-            <select id="post-category">
-              <option>Technology</option>
-              <option>Thoughts</option>
-              <option>Tutorial</option>
-              <option>Code</option>
-              <option>Writing</option>
-              <option>Ideas</option>
-              <option>Design</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Content</label>
-            <textarea id="post-content" rows="6" required></textarea>
-          </div>
-          <div class="form-actions">
-            <button type="submit" class="btn" id="submit-btn">Save Post</button>
-            <button type="button" class="btn btn-secondary modal-close">
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </section>
 
-    <script src="admin-script.js"></script>
-  </body>
+      <!-- Posts Section -->
+      <section id="posts" class="section">
+        <div class="section-header">
+          <h1>Manage Posts</h1>
+          <button id="new-post-btn" class="btn">+ New Post</button>
+        </div>
+        <div id="posts-list" class="list"></div>
+      </section>
+
+      <!-- Comments Section -->
+      <section id="comments" class="section">
+        <h1>Moderate Comments</h1>
+        <div id="comments-list" class="list"></div>
+      </section>
+
+      <!-- Subscribers Section -->
+      <section id="subscribers" class="section">
+        <h1>Email Subscribers</h1>
+        <div id="subscribers-list" class="list"></div>
+      </section>
+
+      <!-- Settings Section -->
+      <section id="settings" class="section">
+        <h1>Settings</h1>
+        <div class="settings-card">
+          <div class="form-group">
+            <label>Blog Title</label>
+            <input type="text" id="blog-title" placeholder="Blog Title" />
+          </div>
+          <div class="form-group">
+            <label>Blog Description</label>
+            <textarea id="blog-description" rows="3" placeholder="Blog Description"></textarea>
+          </div>
+          <div class="form-group">
+            <label>Admin Password</label>
+            <input type="password" id="new-password" placeholder="New Password (leave empty to keep)" />
+          </div>
+          <button id="save-settings-btn" class="btn">Save Settings</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Post Modal -->
+  <div id="post-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modal-title">New Post</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <form id="post-form">
+        <input type="hidden" id="edit-post-id" value="" />
+        <div class="form-group">
+          <label>Title</label>
+          <input type="text" id="post-title" required />
+        </div>
+        <div class="form-group">
+          <label>Category</label>
+          <select id="post-category">
+            <option>Technology</option>
+            <option>Thoughts</option>
+            <option>Tutorial</option>
+            <option>Code</option>
+            <option>Writing</option>
+            <option>Ideas</option>
+            <option>Design</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Content</label>
+          <textarea id="post-content" rows="6" required></textarea>
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn" id="submit-btn">Save Post</button>
+          <button type="button" class="btn btn-secondary modal-close">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="admin-script.js"></script>
+</body>
+
 </html>

@@ -1,71 +1,46 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta
-      name="description"
-      content="Essence - A modern blog with insights, stories, and ideas on technology and design. Discover thought-provoking articles and tutorials."
-    />
-    <meta
-      name="keywords"
-      content="blog, technology, design, insights, stories, tutorials, web development"
-    />
-    <meta name="author" content="Efe" />
-    <meta name="robots" content="index, follow" />
-    <meta name="language" content="English" />
 
-    <!-- Open Graph / Facebook -->
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://essence-blog.com" />
-    <meta property="og:title" content="Essence - Tech Insights & Stories" />
-    <meta
-      property="og:description"
-      content="A modern blog with insights, stories, and ideas on technology and design"
-    />
-    <meta
-      property="og:image"
-      content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 630'><rect fill='%233b82f6' width='1200' height='630'/><text x='50%' y='50%' font-size='60' fill='white' text-anchor='middle' dominant-baseline='middle' font-family='Arial, sans-serif' font-weight='bold'>Essence Blog</text></svg>"
-    />
-    <meta property="og:site_name" content="Essence" />
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description"
+    content="Essence - A modern blog with insights, stories, and ideas on technology and design. Discover thought-provoking articles and tutorials." />
+  <meta name="keywords" content="blog, technology, design, insights, stories, tutorials, web development" />
+  <meta name="author" content="Efe" />
+  <meta name="robots" content="index, follow" />
+  <meta name="language" content="English" />
 
-    <!-- Twitter -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Essence - Tech Insights & Stories" />
-    <meta
-      name="twitter:description"
-      content="A modern blog with insights, stories, and ideas"
-    />
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://essence-blog.com" />
+  <meta property="og:title" content="Essence - Tech Insights & Stories" />
+  <meta property="og:description" content="A modern blog with insights, stories, and ideas on technology and design" />
+  <meta property="og:image"
+    content="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 630'><rect fill='%233b82f6' width='1200' height='630'/><text x='50%' y='50%' font-size='60' fill='white' text-anchor='middle' dominant-baseline='middle' font-family='Arial, sans-serif' font-weight='bold'>Essence Blog</text></svg>" />
+  <meta property="og:site_name" content="Essence" />
 
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta
-      name="apple-mobile-web-app-status-bar-style"
-      content="black-translucent"
-    />
-    <meta name="apple-mobile-web-app-title" content="Essence" />
-    <title>Essence - Tech Insights & Stories</title>
-    <link rel="canonical" href="https://essence-blog.com" />
-    <link
-      rel="apple-touch-icon"
-      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><circle cx='90' cy='90' r='85' fill='%233b82f6' opacity='0.1'/><circle cx='90' cy='90' r='75' fill='none' stroke='%233b82f6' stroke-width='3' opacity='0.3'/><circle cx='90' cy='90' r='65' fill='none' stroke='%233b82f6' stroke-width='3'/><path d='M 65 100 Q 90 60 115 100' stroke='%233b82f6' stroke-width='4' fill='none' stroke-linecap='round'/><circle cx='65' cy='100' r='4' fill='%233b82f6'/><circle cx='90' cy='60' r='4' fill='%233b82f6'/><circle cx='115' cy='100' r='4' fill='%233b82f6'/></svg>"
-    />
-    <link rel="manifest" href="manifest.json" />
-    <link rel="stylesheet" href="styles.css" />
-    <link
-      rel="alternate"
-      type="application/rss+xml"
-      title="Essence RSS"
-      href="/rss.xml"
-    />
-    <!-- Favicon as SVG -->
-    <link
-      rel="icon"
-      type="image/svg+xml"
-      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%233b82f6' opacity='0.1'/><circle cx='50' cy='50' r='40' fill='none' stroke='%233b82f6' stroke-width='2' opacity='0.3'/><circle cx='50' cy='50' r='35' fill='none' stroke='%233b82f6' stroke-width='2'/><path d='M 35 55 Q 50 35 65 55' stroke='%233b82f6' stroke-width='2.5' fill='none' stroke-linecap='round'/><circle cx='35' cy='55' r='2' fill='%233b82f6'/><circle cx='50' cy='35' r='2' fill='%233b82f6'/><circle cx='65' cy='55' r='2' fill='%233b82f6'/></svg>"
-    />
+  <!-- Twitter -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Essence - Tech Insights & Stories" />
+  <meta name="twitter:description" content="A modern blog with insights, stories, and ideas" />
 
-    <!-- JSON-LD Structured Data -->
-    <script type="application/ld+json">
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Essence" />
+  <title>Essence - Tech Insights & Stories</title>
+  <link rel="canonical" href="https://essence-blog.com" />
+  <link rel="apple-touch-icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><circle cx='90' cy='90' r='85' fill='%233b82f6' opacity='0.1'/><circle cx='90' cy='90' r='75' fill='none' stroke='%233b82f6' stroke-width='3' opacity='0.3'/><circle cx='90' cy='90' r='65' fill='none' stroke='%233b82f6' stroke-width='3'/><path d='M 65 100 Q 90 60 115 100' stroke='%233b82f6' stroke-width='4' fill='none' stroke-linecap='round'/><circle cx='65' cy='100' r='4' fill='%233b82f6'/><circle cx='90' cy='60' r='4' fill='%233b82f6'/><circle cx='115' cy='100' r='4' fill='%233b82f6'/></svg>" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="alternate" type="application/rss+xml" title="Essence RSS" href="/rss.xml" />
+  <!-- Favicon as SVG -->
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%233b82f6' opacity='0.1'/><circle cx='50' cy='50' r='40' fill='none' stroke='%233b82f6' stroke-width='2' opacity='0.3'/><circle cx='50' cy='50' r='35' fill='none' stroke='%233b82f6' stroke-width='2'/><path d='M 35 55 Q 50 35 65 55' stroke='%233b82f6' stroke-width='2.5' fill='none' stroke-linecap='round'/><circle cx='35' cy='55' r='2' fill='%233b82f6'/><circle cx='50' cy='35' r='2' fill='%233b82f6'/><circle cx='65' cy='55' r='2' fill='%233b82f6'/></svg>" />
+
+  <!-- JSON-LD Structured Data -->
+  <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "Blog",
@@ -88,431 +63,347 @@
         ]
       }
     </script>
-  </head>
+</head>
 
-  <div id="posts-container"></div>
+<body>
+  <!-- Reading Progress Bar -->
+  <div class="reading-progress"></div>
 
-  <body>
-    <!-- Reading Progress Bar -->
-    <div class="reading-progress"></div>
+  <!-- Back to Top Button -->
+  <button class="back-to-top" title="Back to top">
+    <span>⬆️</span>
+  </button>
 
-    <!-- Back to Top Button -->
-    <button class="back-to-top" title="Back to top">
-      <span>⬆️</span>
-    </button>
+  <!-- Dark Mode Toggle -->
+  <button class="theme-toggle" title="Toggle dark mode">🌙</button>
 
-    <!-- Dark Mode Toggle -->
-    <button class="theme-toggle" title="Toggle dark mode">🌙</button>
+  <!-- Auth Modal -->
+  <div id="auth-modal" class="modal hidden">
+    <div class="modal-content auth-modal">
+      <button class="modal-close">&times;</button>
 
-    <!-- Auth Modal -->
-    <div id="auth-modal" class="modal hidden">
-      <div class="modal-content auth-modal">
-        <button class="modal-close">&times;</button>
+      <div id="auth-tabs" class="auth-tabs">
+        <button class="auth-tab active" data-tab="login">Login</button>
+        <button class="auth-tab" data-tab="register">Register</button>
+      </div>
 
-        <div id="auth-tabs" class="auth-tabs">
-          <button class="auth-tab active" data-tab="login">Login</button>
-          <button class="auth-tab" data-tab="register">Register</button>
-        </div>
+      <!-- Login Form -->
+      <form id="login-form" class="auth-form active">
+        <h2>Login</h2>
+        <input type="email" id="login-email" placeholder="Email" required />
+        <input type="password" id="login-password" placeholder="Password" required />
+        <button type="submit" class="btn">Login</button>
+        <p class="auth-message" id="login-message"></p>
+      </form>
 
-        <!-- Login Form -->
-        <form id="login-form" class="auth-form active">
-          <h2>Login</h2>
-          <input type="email" id="login-email" placeholder="Email" required />
-          <input
-            type="password"
-            id="login-password"
-            placeholder="Password"
-            required
-          />
-          <button type="submit" class="btn">Login</button>
-          <p class="auth-message" id="login-message"></p>
-        </form>
+      <!-- Register Form -->
+      <form id="register-form" class="auth-form">
+        <h2>Create Account</h2>
+        <input type="text" id="register-username" placeholder="Username" required />
+        <input type="email" id="register-email" placeholder="Email" required />
+        <input type="password" id="register-password" placeholder="Password (min 6 chars)" required />
+        <input type="password" id="register-confirm" placeholder="Confirm Password" required />
+        <button type="submit" class="btn">Register</button>
+        <p class="auth-message" id="register-message"></p>
+      </form>
+    </div>
+  </div>
 
-        <!-- Register Form -->
-        <form id="register-form" class="auth-form">
-          <h2>Create Account</h2>
-          <input
-            type="text"
-            id="register-username"
-            placeholder="Username"
-            required
-          />
-          <input
-            type="email"
-            id="register-email"
-            placeholder="Email"
-            required
-          />
-          <input
-            type="password"
-            id="register-password"
-            placeholder="Password (min 6 chars)"
-            required
-          />
-          <input
-            type="password"
-            id="register-confirm"
-            placeholder="Confirm Password"
-            required
-          />
-          <button type="submit" class="btn">Register</button>
-          <p class="auth-message" id="register-message"></p>
-        </form>
+  <!-- User Profile Dropdown -->
+  <div id="user-profile-dropdown" class="user-dropdown hidden">
+    <div id="user-info" class="user-info"></div>
+    <button id="logout-btn" class="btn btn-secondary">Logout</button>
+  </div>
+
+  <!-- Auth Header Button -->
+  <button id="auth-btn" class="auth-header-btn">👤 Login</button>
+
+  <!-- Hero Section -->
+  <header class="site-header" id="top">
+    <div class="hero-gradient"></div>
+    <div class="header-content">
+      <svg class="logo" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <!-- Hexagon geometric shape -->
+        <polygon points="50,15 85,35 85,65 50,85 15,65 15,35" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linejoin="round" />
+        <polygon points="50,25 75,40 75,60 50,75 25,60 25,40" fill="currentColor" opacity="0.3" />
+        <circle cx="50" cy="50" r="8" fill="currentColor" />
+      </svg>
+      <h1 class="main-title">Essence</h1>
+      <p class="tagline">Explore ideas, stories, and insights</p>
+      <div class="header-decoration">
+        <span class="dot dot-1"></span>
+        <span class="dot dot-2"></span>
+        <span class="dot dot-3"></span>
       </div>
     </div>
+  </header>
 
-    <!-- User Profile Dropdown -->
-    <div id="user-profile-dropdown" class="user-dropdown hidden">
-      <div id="user-info" class="user-info"></div>
-      <button id="logout-btn" class="btn btn-secondary">Logout</button>
+  <!-- Navigation Menu -->
+  <nav class="main-nav" aria-label="Main Navigation">
+    <div class="nav-container">
+      <a href="index.html" class="nav-link active">Home</a>
+      <a href="about.html" class="nav-link">About</a>
+      <a href="index.html#posts-section" class="nav-link">Blog</a>
+      <a href="mailto:contact@essence-blog.com" class="nav-link">Contact</a>
     </div>
+  </nav>
 
-    <!-- Auth Header Button -->
-    <button id="auth-btn" class="auth-header-btn">👤 Login</button>
-
-    <!-- Hero Section -->
-    <header class="site-header" id="top">
-      <div class="hero-gradient"></div>
-      <div class="header-content">
-        <svg
-          class="logo"
-          viewBox="0 0 100 100"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <!-- Hexagon geometric shape -->
-          <polygon
-            points="50,15 85,35 85,65 50,85 15,65 15,35"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2.5"
-            stroke-linejoin="round"
-          />
-          <polygon
-            points="50,25 75,40 75,60 50,75 25,60 25,40"
-            fill="currentColor"
-            opacity="0.3"
-          />
-          <circle cx="50" cy="50" r="8" fill="currentColor" />
-        </svg>
-        <h1 class="main-title">Essence</h1>
-        <p class="tagline">Explore ideas, stories, and insights</p>
-        <div class="header-decoration">
-          <span class="dot dot-1"></span>
-          <span class="dot dot-2"></span>
-          <span class="dot dot-3"></span>
+  <main class="container">
+    <!-- Featured Post -->
+    <section class="featured-section">
+      <h2 class="section-title">Latest Articles</h2>
+      <article class="featured-post">
+        <div class="featured-content">
+          <div class="post-badge">Featured</div>
+          <h2><a href="posts/post2.html">Welcome to my blog</a></h2>
+          <p class="post-meta">
+            <span class="meta-date">📅 November 26, 2025</span>
+            <span class="meta-reading">⏱️ less than 1</span>
+          </p>
+          <p class="featured-excerpt">
+            Explore the latest breakthroughs in AI, quantum computing,
+            renewable energy, and cybersecurity.
+          </p>
+          <div class="share-buttons">
+            <button class="share-btn" data-share="X" title="Share on X">
+              𝕏
+            </button>
+            <button class="share-btn" data-share="facebook" title="Share on Facebook">
+              f
+            </button>
+            <button class="share-btn" data-share="linkedin" title="Share on LinkedIn">
+              in
+            </button>
+            <button class="share-btn" data-share="copy" title="Copy link">
+              🔗
+            </button>
+          </div>
+          <a href="posts/post2.html" aria-label="Read full article: Welcome to my blog">Read Full Article →</a>
         </div>
-      </div>
-    </header>
+        <div class="featured-visual">
+          <img src="cyber-security.jpg" loading="lazy" alt="Blog preview" class="featured-image" />
+        </div>
+      </article>
 
-    <!-- Navigation Menu -->
-    <nav class="main-nav" aria-label="Main Navigation">
-      <div class="nav-container">
-        <a href="index.html" class="nav-link active">Home</a>
-        <a href="about.html" class="nav-link">About</a>
-        <a href="index.html#posts-section" class="nav-link">Blog</a>
-        <a href="mailto:contact@essence-blog.com" class="nav-link">Contact</a>
-      </div>
-    </nav>
+      <!-- COMMENTS SECTION -->
+      <section class="comments-section" data-post-id="1">
+        <h3>💬 Comments (<span class="comments-count">0</span>)</h3>
 
-    <main class="container">
-      <!-- Featured Post -->
-      <section class="featured-section">
-        <h2 class="section-title">Latest Articles</h2>
-        <article class="featured-post">
-          <div class="featured-content">
-            <div class="post-badge">Featured</div>
-            <h2><a href="posts/post2.html">Welcome to my blog</a></h2>
-            <p class="post-meta">
-              <span class="meta-date">📅 November 26, 2025</span>
-              <span class="meta-reading">⏱️ less than 1</span>
+        <div class="comments-list"></div>
+
+        <div class="comment-form">
+          <h4>Leave a Comment</h4>
+          <input type="text" class="comment-name" placeholder="Your name..." />
+          <textarea class="comment-text" placeholder="Share your thoughts..." rows="4"></textarea>
+          <button class="comment-submit">Post Comment</button>
+        </div>
+      </section>
+    </section>
+
+    <div class="main-content">
+      <!-- Posts Grid -->
+      <section class="posts" id="posts-section">
+        <div class="posts-header">
+          <h2 class="section-title">All Posts</h2>
+          <input type="text" class="search-input" placeholder="🔍 Search posts..." />
+        </div>
+        <div class="filter-tags">
+          <button class="filter-btn active" data-filter="all">
+            All Posts
+          </button>
+          <button class="filter-btn" data-filter="Technology">
+            Technology
+          </button>
+          <button class="filter-btn" data-filter="Thoughts">Thoughts</button>
+          <button class="filter-btn" data-filter="Tutorial">Tutorial</button>
+        </div>
+        <div class="posts-grid">
+          <article class="post-card">
+            <div class="post-header">
+              <div class="post-category">Technology</div>
+            </div>
+            <h3><a href="posts/post1.html">Welcome to my blog</a></h3>
+            <p class="post-meta">November 26, 2025</p>
+            <p class="post-excerpt">
+              Discover insights, stories, and ideas on technology, design, and
+              web development.
             </p>
-            <p class="featured-excerpt">
+            <a href="posts/post1.html" class="post-link">Read More →</a>
+          </article>
+
+          <article class="post-card">
+            <div class="post-header">
+              <div class="post-category">Technology</div>
+            </div>
+            <h3>
+              <a href="posts/post2.html">Latest Technology News and Innovations</a>
+            </h3>
+            <p class="post-meta">March 2026</p>
+            <p class="post-excerpt">
               Explore the latest breakthroughs in AI, quantum computing,
               renewable energy, and cybersecurity.
             </p>
-            <div class="share-buttons">
-              <button class="share-btn" data-share="X" title="Share on X">
-                𝕏
-              </button>
-              <button
-                class="share-btn"
-                data-share="facebook"
-                title="Share on Facebook"
-              >
-                f
-              </button>
-              <button
-                class="share-btn"
-                data-share="linkedin"
-                title="Share on LinkedIn"
-              >
-                in
-              </button>
-              <button class="share-btn" data-share="copy" title="Copy link">
-                🔗
-              </button>
+            <a href="posts/post2.html" class="post-link">Read More →</a>
+          </article>
+
+          <article class="post-card">
+            <div class="post-header">
+              <div class="post-category">Thoughts</div>
             </div>
-            <a
-              href="posts/post2.html"
-              aria-label="Read full article: Welcome to my blog"
-              >Read Full Article →</a
-            >
-          </div>
-          <div class="featured-visual">
-            <img
-              src="cyber-security.jpg"
-              loading="lazy"
-              alt="Blog preview"
-              class="featured-image"
-            />
-          </div>
-        </article>
+            <h3>
+              <a href="posts/post3.html">Getting Started with Your Blog</a>
+            </h3>
+            <p class="post-meta">December 10, 2025</p>
+            <p class="post-excerpt">
+              Essential steps to get your blog up and running and build a
+              dedicated audience.
+            </p>
+            <a href="posts/post3.html" class="post-link">Read More →</a>
+          </article>
 
-        <!-- COMMENTS SECTION -->
-        <section class="comments-section" data-post-id="1">
-          <h3>💬 Comments (<span class="comments-count">0</span>)</h3>
+          <article class="post-card">
+            <div class="post-header">
+              <div class="post-category">Tutorial</div>
+            </div>
+            <h3>
+              <a href="posts/post4.html">Advanced Customization Techniques</a>
+            </h3>
+            <p class="post-meta">January 15, 2026</p>
+            <p class="post-excerpt">
+              Master CSS Grid, custom properties, and JavaScript for
+              professional web design.
+            </p>
+            <a href="posts/post4.html" class="post-link">Read More →</a>
+          </article>
 
-          <div class="comments-list"></div>
+          <article class="post-card">
+            <div class="post-header">
+              <div class="post-category">Technology</div>
+            </div>
+            <h3>
+              <a href="posts/post5.html">How Computers Are Made</a>
+            </h3>
+            <p class="post-meta">May 5, 2026</p>
+            <p class="post-excerpt">
+              At some point, everyone looks at a computer and thinks: “There
+              is no way this thing runs on just 0s and 1s.” But yes—it
+              absolutely does.
+            </p>
+            <a href="posts/post5.html" class="post-link">Read More →</a>
+          </article>
 
-          <div class="comment-form">
-            <h4>Leave a Comment</h4>
-            <input
-              type="text"
-              class="comment-name"
-              placeholder="Your name..."
-            />
-            <textarea
-              class="comment-text"
-              placeholder="Share your thoughts..."
-              rows="4"
-            ></textarea>
-            <button class="comment-submit">Post Comment</button>
-          </div>
-        </section>
+          <article class="post-card">
+            <div class="post-header">
+              <div class="post-category">Technology</div>
+            </div>
+            <h3>
+              <a href="posts/post6.html">The Biggest Tech Trends Defining 2026</a>
+            </h3>
+            <p class="post-meta">May 16, 2026</p>
+            <p class="post-excerpt">
+              Technology in 2026 is moving faster than ever, reshaping the way
+              people work, communicate, shop, and live.
+            </p>
+            <a href="posts/post6.html" class="post-link">Read More →</a>
+          </article>
+
+          <article class="post-card">
+            <div class="post-header">
+              <div class="post-category">Technology</div>
+            </div>
+            <h3>
+              <a href="posts/post7.html">Latest Technology Trends Shaping the Future in 2026</a>
+            </h3>
+            <p class="post-meta">May 16, 2026</p>
+            <p class="post-excerpt">
+              Latest Technology Trends Shaping the Future in 2026 In 2026, the
+              most impactful technology trends are no longer just emerging
+              concepts—they are actively reshaping the global economy and
+              redefining competitive advantage.
+            </p>
+            <a href="posts/post7.html" class="post-link">Read More →</a>
+          </article>
+        </div>
       </section>
 
-      <div class="main-content">
-        <!-- Posts Grid -->
-        <section class="posts" id="posts-section">
-          <div class="posts-header">
-            <h2 class="section-title">All Posts</h2>
-            <input
-              type="text"
-              class="search-input"
-              placeholder="🔍 Search posts..."
-            />
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <div class="sidebar-widget">
+          <h3>📝 Recent Posts</h3>
+          <div class="recent-posts-list" id="recent-posts">
+            <p class="sidebar-loading-text">Loading recent posts...</p>
           </div>
-          <div class="filter-tags">
-            <button class="filter-btn active" data-filter="all">
-              All Posts
-            </button>
-            <button class="filter-btn" data-filter="Technology">
-              Technology
-            </button>
-            <button class="filter-btn" data-filter="Thoughts">Thoughts</button>
-            <button class="filter-btn" data-filter="Tutorial">Tutorial</button>
-          </div>
-          <div class="posts-grid">
-            <article class="post-card">
-              <div class="post-header">
-                <div class="post-category">Technology</div>
-              </div>
-              <h3><a href="posts/post1.html">Welcome to my blog</a></h3>
-              <p class="post-meta">November 26, 2025</p>
-              <p class="post-excerpt">
-                Discover insights, stories, and ideas on technology, design, and
-                web development.
-              </p>
-              <a href="posts/post1.html" class="post-link">Read More →</a>
-            </article>
-
-            <article class="post-card">
-              <div class="post-header">
-                <div class="post-category">Technology</div>
-              </div>
-              <h3>
-                <a href="posts/post2.html"
-                  >Latest Technology News and Innovations</a
-                >
-              </h3>
-              <p class="post-meta">March 2026</p>
-              <p class="post-excerpt">
-                Explore the latest breakthroughs in AI, quantum computing,
-                renewable energy, and cybersecurity.
-              </p>
-              <a href="posts/post2.html" class="post-link">Read More →</a>
-            </article>
-
-            <article class="post-card">
-              <div class="post-header">
-                <div class="post-category">Thoughts</div>
-              </div>
-              <h3>
-                <a href="posts/post3.html">Getting Started with Your Blog</a>
-              </h3>
-              <p class="post-meta">December 10, 2025</p>
-              <p class="post-excerpt">
-                Essential steps to get your blog up and running and build a
-                dedicated audience.
-              </p>
-              <a href="posts/post3.html" class="post-link">Read More →</a>
-            </article>
-
-            <article class="post-card">
-              <div class="post-header">
-                <div class="post-category">Tutorial</div>
-              </div>
-              <h3>
-                <a href="posts/post4.html">Advanced Customization Techniques</a>
-              </h3>
-              <p class="post-meta">January 15, 2026</p>
-              <p class="post-excerpt">
-                Master CSS Grid, custom properties, and JavaScript for
-                professional web design.
-              </p>
-              <a href="posts/post4.html" class="post-link">Read More →</a>
-            </article>
-
-            <article class="post-card">
-              <div class="post-header">
-                <div class="post-category">Technology</div>
-              </div>
-              <h3>
-                <a href="posts/post5.html">How Computers Are Made</a>
-              </h3>
-              <p class="post-meta">May 5, 2026</p>
-              <p class="post-excerpt">
-                At some point, everyone looks at a computer and thinks: “There
-                is no way this thing runs on just 0s and 1s.” But yes—it
-                absolutely does.
-              </p>
-              <a href="posts/post5.html" class="post-link">Read More →</a>
-            </article>
-
-            <article class="post-card">
-              <div class="post-header">
-                <div class="post-category">Technology</div>
-              </div>
-              <h3>
-                <a href="posts/post6.html"
-                  >The Biggest Tech Trends Defining 2026</a
-                >
-              </h3>
-              <p class="post-meta">May 16, 2026</p>
-              <p class="post-excerpt">
-                Technology in 2026 is moving faster than ever, reshaping the way
-                people work, communicate, shop, and live.
-              </p>
-              <a href="posts/post6.html" class="post-link">Read More →</a>
-            </article>
-
-            <article class="post-card">
-              <div class="post-header">
-                <div class="post-category">Technology</div>
-              </div>
-              <h3>
-                <a href="posts/post7.html"
-                  >Latest Technology Trends Shaping the Future in 2026</a
-                >
-              </h3>
-              <p class="post-meta">May 16, 2026</p>
-              <p class="post-excerpt">
-                Latest Technology Trends Shaping the Future in 2026 In 2026, the
-                most impactful technology trends are no longer just emerging
-                concepts—they are actively reshaping the global economy and
-                redefining competitive advantage.
-              </p>
-              <a href="posts/post7.html" class="post-link">Read More →</a>
-            </article>
-          </div>
-        </section>
-
-        <!-- Sidebar -->
-        <aside class="sidebar">
-          <div class="sidebar-widget">
-            <h3>📝 Recent Posts</h3>
-            <div class="recent-posts-list" id="recent-posts">
-              <p class="sidebar-loading-text">Loading recent posts...</p>
-            </div>
-          </div>
-
-          <div class="sidebar-widget">
-            <h3>About This Blog</h3>
-            <p>
-              A modern, minimal blog scaffold designed for writers and creators.
-              Deploy anywhere and customize effortlessly.
-            </p>
-          </div>
-
-          <div class="sidebar-widget">
-            <h3>🔥 Popular This Month</h3>
-            <div class="popular-posts-list" id="popular-posts">
-              <p class="sidebar-loading-text">Loading popular posts...</p>
-            </div>
-          </div>
-
-          <div class="sidebar-widget">
-            <h3>Popular Tags</h3>
-            <div class="tags" id="popular-tags">
-              <a href="#" class="tag" data-tag="loading">Loading...</a>
-            </div>
-          </div>
-
-          <div class="sidebar-widget">
-            <h3>✉️ Subscribe</h3>
-            <input type="email" placeholder="Your email" class="email-input" />
-            <button class="subscribe-btn">Subscribe</button>
-          </div>
-        </aside>
-      </div>
-    </main>
-
-    <!-- Footer -->
-    <footer class="site-footer">
-      <div class="footer-content">
-        <div class="footer-section">
-          <h4>About</h4>
-          <p>A modern blog built with simplicity in mind.</p>
         </div>
-        <div class="footer-section">
-          <h4>Links</h4>
-          <ul>
-            <li><a href="index.html#top">Home</a></li>
-            <li><a href="index.html#posts-section">Posts</a></li>
-            <li><a href="mailto:godswillefe24@gmail.com">Contact</a></li>
-          </ul>
+
+        <div class="sidebar-widget">
+          <h3>About This Blog</h3>
+          <p>
+            A modern, minimal blog scaffold designed for writers and creators.
+            Deploy anywhere and customize effortlessly.
+          </p>
         </div>
-        <div class="footer-section">
-          <h4>Follow</h4>
-          <ul>
-            <li>
-              <a
-                href="http://x.com/efe_swill"
-                target="_blank"
-                rel="noopener noreferrer"
-                >X</a
-              >
-            </li>
-            <li>
-              <a
-                href="https://github.com/godswillefe24-beep/my-blog"
-                target="_blank"
-                rel="noopener noreferrer"
-                >GitHub</a
-              >
-            </li>
-            <li>
-              <a href="" target="_blank" rel="noopener noreferrer">LinkedIn</a>
-            </li>
-          </ul>
+
+        <div class="sidebar-widget">
+          <h3>🔥 Popular This Month</h3>
+          <div class="popular-posts-list" id="popular-posts">
+            <p class="sidebar-loading-text">Loading popular posts...</p>
+          </div>
         </div>
+
+        <div class="sidebar-widget">
+          <h3>Popular Tags</h3>
+          <div class="tags" id="popular-tags">
+            <a href="#" class="tag" data-tag="loading">Loading...</a>
+          </div>
+        </div>
+
+        <div class="sidebar-widget">
+          <h3>✉️ Subscribe</h3>
+          <input type="email" placeholder="Your email" class="email-input" />
+          <button class="subscribe-btn">Subscribe</button>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <div class="footer-content">
+      <div class="footer-section">
+        <h4>About</h4>
+        <p>A modern blog built with simplicity in mind.</p>
       </div>
-      <div class="footer-bottom">
-        <p>&copy; 2026 — Efe. Built with ❤️</p>
+      <div class="footer-section">
+        <h4>Links</h4>
+        <ul>
+          <li><a href="index.html#top">Home</a></li>
+          <li><a href="index.html#posts-section">Posts</a></li>
+          <li><a href="mailto:godswillefe24@gmail.com">Contact</a></li>
+        </ul>
       </div>
-    </footer>
-  </body>
-  <script src="script.js" defer></script>
-  <script src="enhancements.js" defer></script>
-  <script src="script-enhancements.js" defer></script>
+      <div class="footer-section">
+        <h4>Follow</h4>
+        <ul>
+          <li>
+            <a href="http://x.com/efe_swill" target="_blank" rel="noopener noreferrer">X</a>
+          </li>
+          <li>
+            <a href="https://github.com/godswillefe24-beep/my-blog" target="_blank" rel="noopener noreferrer">GitHub</a>
+          </li>
+          <li>
+            <a href="" target="_blank" rel="noopener noreferrer">LinkedIn</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; 2026 — Efe. Built with ❤️</p>
+    </div>
+  </footer>
+</body>
+<script src="script.js" defer></script>
+<script src="enhancements.js" defer></script>
+<script src="script-enhancements.js" defer></script>
+
 </html>
