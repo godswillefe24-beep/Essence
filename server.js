@@ -41,6 +41,9 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(__dirname));
 
+import chatRouter from "./routes/chat.js";
+app.use("/api/chat", chatRouter);
+
 // ==========================================
 // LOGGING & VALIDATION HELPERS
 // ==========================================
@@ -150,14 +153,24 @@ function initializeDataFiles() {
     fs.writeFileSync(postsFile, JSON.stringify([], null, 2));
   }
   if (!fs.existsSync(settingsFile)) {
+    const generatedPassword =
+      process.env.ADMIN_PASSWORD || crypto.randomBytes(12).toString("hex");
+
+    if (!process.env.ADMIN_PASSWORD) {
+      console.warn(
+        "[WARN] No ADMIN_PASSWORD env var set. Generated a random admin password " +
+          "for first run — check data/settings.json to retrieve it, then set " +
+          "ADMIN_PASSWORD in your environment and rotate it.",
+      );
+    }
+
     fs.writeFileSync(
       settingsFile,
       JSON.stringify(
         {
           title: "Essence",
           description: "A modern blog",
-          adminPassword:
-            process.env.ADMIN_PASSWORD || "change-this-to-a-strong-password",
+          adminPassword: generatedPassword,
         },
         null,
         2,
@@ -750,19 +763,12 @@ app.post("/api/subscribe", async (req, res) => {
   }
 });
 
-// Start server
-const ADMIN_TOKEN = "essence-admin-token-2026";
-
 function getAdminPassword() {
   try {
     const current = JSON.parse(fs.readFileSync(settingsFile, "utf8") || "{}");
-    return (
-      current.adminPassword ||
-      process.env.ADMIN_PASSWORD ||
-      "change-this-to-a-strong-password"
-    );
+    return current.adminPassword || process.env.ADMIN_PASSWORD || null;
   } catch {
-    return process.env.ADMIN_PASSWORD || "change-this-to-a-strong-password";
+    return process.env.ADMIN_PASSWORD || null;
   }
 }
 
@@ -995,34 +1001,76 @@ app.put("/api/users/profile/:id", (req, res) => {
 // ADMIN AUTHENTICATION
 // ==========================================
 
+// Rate limit admin login attempts harder than general traffic (brute-force protection)
 app.post("/api/admin/login", (req, res) => {
   const { password } = req.body;
+
+  const rateLimitKey = `admin-login-${req.ip}`;
+  if (!checkRateLimit(rateLimitKey, 5, 60000)) {
+    return res.status(429).json({
+      error: "Too many login attempts, please wait before trying again",
+    });
+  }
+
   try {
-    const settingsRaw = fs.readFileSync(settingsFile, "utf8");
-    const settings = JSON.parse(settingsRaw || "{}");
-    const stored = settings.adminPassword || getAdminPassword();
-    if (password === stored) {
-      res.json({ token: ADMIN_TOKEN });
-    } else {
-      res.status(401).json({ error: "Invalid password" });
+    if (typeof password !== "string" || !password) {
+      return res.status(401).json({ error: "Invalid password" });
     }
+
+    let stored;
+    try {
+      const settingsRaw = fs.readFileSync(settingsFile, "utf8");
+      const settings = JSON.parse(settingsRaw || "{}");
+      stored = settings.adminPassword || getAdminPassword();
+    } catch {
+      stored = getAdminPassword();
+    }
+
+    if (!stored) {
+      logError("Admin login", new Error("No admin password configured"));
+      return res.status(500).json({ error: "Admin login is not configured" });
+    }
+
+    // Constant-time comparison to avoid leaking password length/content via timing
+    const passwordBuf = Buffer.from(password);
+    const storedBuf = Buffer.from(stored);
+    const isMatch =
+      passwordBuf.length === storedBuf.length &&
+      crypto.timingSafeEqual(passwordBuf, storedBuf);
+
+    if (!isMatch) {
+      return res.status(401).json({ error: "Invalid password" });
+    }
+
+    // Issue a real, short-lived, signed session token instead of a static string
+    const token = jwt.sign({ role: "admin" }, JWT_SECRET, {
+      expiresIn: "12h",
+    });
+
+    res.json({ token });
   } catch (err) {
-    if (password === getAdminPassword()) {
-      res.json({ token: ADMIN_TOKEN });
-    } else {
-      res.status(401).json({ error: "Invalid password" });
-    }
+    logError("Admin login", err);
+    res.status(500).json({ error: "Login failed" });
   }
 });
 
-// Middleware to check admin token
+// Middleware to check admin session token
 function verifyAdmin(req, res, next) {
   const authHeader = req.headers.authorization;
   const token = authHeader?.split(" ")[1];
 
-  if (token === ADMIN_TOKEN) {
+  if (!token) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.role !== "admin") {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    req.admin = decoded;
     next();
-  } else {
+  } catch (err) {
     res.status(401).json({ error: "Unauthorized" });
   }
 }
@@ -1104,10 +1152,8 @@ app.post("/api/admin/settings", verifyAdmin, (req, res) => {
 
     fs.writeFileSync(settingsFile, JSON.stringify(updated, null, 2), "utf8");
 
-    // Update runtime admin password so login uses new value immediately
-    try {
-      global.ADMIN_PASSWORD = updated.adminPassword;
-    } catch (e) {}
+    // No in-memory cache to update — getAdminPassword() always reads
+    // settingsFile fresh, so the new password takes effect on the next login.
 
     res.json({ success: true });
   } catch (error) {

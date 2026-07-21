@@ -1,195 +1,158 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta
-      name="description"
-      content="About Essence - Learn more about the blog author and mission"
-    />
-    <meta name="theme-color" content="#3b82f6" />
-    <title>About - Essence Blog</title>
-    <link rel="canonical" href="https://essence-blog.com/about.html" />
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <!-- Back to Top Button -->
-    <button class="back-to-top">↑</button>
 
-    <!-- Reading Progress Bar -->
-    <div class="reading-progress"></div>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="About Essence - Learn more about the blog author and mission" />
+  <meta name="theme-color" content="#3b82f6" />
+  <title>About - Essence Blog</title>
+  <link rel="canonical" href="https://essence-blog.com/about.html" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="public/css/chat-widget.css">
+</head>
 
-    <!-- Theme Toggle -->
-    <button class="theme-toggle">🌙</button>
+<body>
+  <!-- Back to Top Button -->
+  <button class="back-to-top">↑</button>
 
-    <!-- Auth Header Button -->
-    <button id="auth-btn" class="auth-header-btn">👤 Login</button>
+  <!-- Reading Progress Bar -->
+  <div class="reading-progress"></div>
 
-    <!-- Auth Modal -->
-    <div id="auth-modal" class="modal hidden">
-      <div class="modal-content auth-modal">
-        <button class="modal-close">&times;</button>
-        <div id="auth-tabs" class="auth-tabs">
-          <button class="auth-tab active" data-tab="login">Login</button>
-          <button class="auth-tab" data-tab="register">Register</button>
-        </div>
-        <form id="login-form" class="auth-form active">
-          <h2>Login</h2>
-          <input type="email" id="login-email" placeholder="Email" required />
-          <input
-            type="password"
-            id="login-password"
-            placeholder="Password"
-            required
-          />
-          <button type="submit" class="btn">Login</button>
-          <p class="auth-message" id="login-message"></p>
-        </form>
-        <form id="register-form" class="auth-form">
-          <h2>Create Account</h2>
-          <input
-            type="text"
-            id="register-username"
-            placeholder="Username"
-            required
-          />
-          <input
-            type="email"
-            id="register-email"
-            placeholder="Email"
-            required
-          />
-          <input
-            type="password"
-            id="register-password"
-            placeholder="Password (min 6 chars)"
-            required
-          />
-          <input
-            type="password"
-            id="register-confirm"
-            placeholder="Confirm Password"
-            required
-          />
-          <button type="submit" class="btn">Register</button>
-          <p class="auth-message" id="register-message"></p>
-        </form>
+  <!-- Theme Toggle -->
+  <button class="theme-toggle">🌙</button>
+
+  <!-- Auth Header Button -->
+  <button id="auth-btn" class="auth-header-btn">👤 Login</button>
+
+  <!-- Auth Modal -->
+  <div id="auth-modal" class="modal hidden">
+    <div class="modal-content auth-modal">
+      <button class="modal-close">&times;</button>
+      <div id="auth-tabs" class="auth-tabs">
+        <button class="auth-tab active" data-tab="login">Login</button>
+        <button class="auth-tab" data-tab="register">Register</button>
       </div>
+      <form id="login-form" class="auth-form active">
+        <h2>Login</h2>
+        <input type="email" id="login-email" placeholder="Email" required />
+        <input type="password" id="login-password" placeholder="Password" required />
+        <button type="submit" class="btn">Login</button>
+        <p class="auth-message" id="login-message"></p>
+      </form>
+      <form id="register-form" class="auth-form">
+        <h2>Create Account</h2>
+        <input type="text" id="register-username" placeholder="Username" required />
+        <input type="email" id="register-email" placeholder="Email" required />
+        <input type="password" id="register-password" placeholder="Password (min 6 chars)" required />
+        <input type="password" id="register-confirm" placeholder="Confirm Password" required />
+        <button type="submit" class="btn">Register</button>
+        <p class="auth-message" id="register-message"></p>
+      </form>
     </div>
+  </div>
 
-    <!-- User Profile Dropdown -->
-    <div id="user-profile-dropdown" class="user-dropdown hidden">
-      <div id="user-info" class="user-info"></div>
-      <button id="logout-btn" class="btn btn-secondary">Logout</button>
+  <!-- User Profile Dropdown -->
+  <div id="user-profile-dropdown" class="user-dropdown hidden">
+    <div id="user-info" class="user-info"></div>
+    <button id="logout-btn" class="btn btn-secondary">Logout</button>
+  </div>
+
+  <!-- Header -->
+  <header class="site-header" id="top">
+    <div class="hero-gradient"></div>
+    <div class="header-content">
+      <h1 class="main-title">About Essence</h1>
+      <p class="tagline">Get to know the story behind the blog</p>
     </div>
+  </header>
 
-    <!-- Header -->
-    <header class="site-header" id="top">
-      <div class="hero-gradient"></div>
-      <div class="header-content">
-        <h1 class="main-title">About Essence</h1>
-        <p class="tagline">Get to know the story behind the blog</p>
-      </div>
-    </header>
+  <main class="container">
+    <!-- About Section -->
+    <article class="post-preview about-section">
+      <div class="post-content">
+        <h2>Who Am I?</h2>
+        <p>
+          Welcome! I'm <strong>Efe</strong>, the creator and author of
+          Essence. This blog is dedicated to sharing insights, stories, and
+          ideas about technology, design, and personal growth.
+        </p>
+        <p>
+          I believe that complex topics can be explained simply, and that good
+          writing has the power to inspire, educate, and connect people across
+          the globe.
+        </p>
 
-    <main class="container">
-      <!-- About Section -->
-      <article class="post-preview about-section">
-        <div class="post-content">
-          <h2>Who Am I?</h2>
-          <p>
-            Welcome! I'm <strong>Efe</strong>, the creator and author of
-            Essence. This blog is dedicated to sharing insights, stories, and
-            ideas about technology, design, and personal growth.
-          </p>
-          <p>
-            I believe that complex topics can be explained simply, and that good
-            writing has the power to inspire, educate, and connect people across
-            the globe.
-          </p>
+        <h2>What is Essence?</h2>
+        <p>Essence is a blog where I explore topics that fascinate me:</p>
+        <ul class="about-list">
+          <li>
+            <strong>Technology:</strong> Latest trends in AI, cybersecurity,
+            and web development
+          </li>
+          <li>
+            <strong>Design:</strong> User experience, interfaces, and creative
+            problem-solving
+          </li>
+          <li>
+            <strong>Insights:</strong> Lessons learned, personal growth, and
+            reflections
+          </li>
+          <li>
+            <strong>Stories:</strong> Real-world experiences and technical
+            breakdowns
+          </li>
+        </ul>
 
-          <h2>What is Essence?</h2>
-          <p>Essence is a blog where I explore topics that fascinate me:</p>
-          <ul class="about-list">
-            <li>
-              <strong>Technology:</strong> Latest trends in AI, cybersecurity,
-              and web development
-            </li>
-            <li>
-              <strong>Design:</strong> User experience, interfaces, and creative
-              problem-solving
-            </li>
-            <li>
-              <strong>Insights:</strong> Lessons learned, personal growth, and
-              reflections
-            </li>
-            <li>
-              <strong>Stories:</strong> Real-world experiences and technical
-              breakdowns
-            </li>
-          </ul>
+        <h2>My Mission</h2>
+        <p>My goal is to create content that:</p>
+        <ul class="about-list">
+          <li>
+            Educates readers about complex technical topics in an accessible
+            way
+          </li>
+          <li>Inspires people to explore new ideas and technologies</li>
+          <li>Builds a community of curious, thoughtful individuals</li>
+          <li>Provides practical, actionable insights</li>
+        </ul>
 
-          <h2>My Mission</h2>
-          <p>My goal is to create content that:</p>
-          <ul class="about-list">
-            <li>
-              Educates readers about complex technical topics in an accessible
-              way
-            </li>
-            <li>Inspires people to explore new ideas and technologies</li>
-            <li>Builds a community of curious, thoughtful individuals</li>
-            <li>Provides practical, actionable insights</li>
-          </ul>
-
-          <h2>Get In Touch</h2>
-          <p>
-            I'd love to hear from you! Whether you have feedback, questions, or
-            just want to chat about technology and design:
-          </p>
-          <div class="contact-links">
-            <a href="https://twitter.com" class="social-link" target="_blank"
-              >Twitter</a
-            >
-            <a href="https://linkedin.com" class="social-link" target="_blank"
-              >LinkedIn</a
-            >
-            <a href="https://github.com" class="social-link" target="_blank"
-              >GitHub</a
-            >
-            <a href="mailto:contact@essence-blog.com" class="social-link"
-              >Email</a
-            >
-          </div>
-
-          <h2>Subscribe for Updates</h2>
-          <p>
-            Don't miss new posts! Subscribe to get articles delivered to your
-            inbox:
-          </p>
-          <form id="subscribe-form" class="subscribe-box">
-            <input
-              type="email"
-              id="subscribe-email"
-              placeholder="Your email"
-              required
-            />
-            <button type="submit" class="btn">Subscribe</button>
-            <p id="subscribe-message" class="form-message"></p>
-          </form>
-
-          <div class="back-link">
-            <a href="index.html">← Back to Home</a>
-          </div>
+        <h2>Get In Touch</h2>
+        <p>
+          I'd love to hear from you! Whether you have feedback, questions, or
+          just want to chat about technology and design:
+        </p>
+        <div class="contact-links">
+          <a href="https://twitter.com" class="social-link" target="_blank">Twitter</a>
+          <a href="https://linkedin.com" class="social-link" target="_blank">LinkedIn</a>
+          <a href="https://github.com" class="social-link" target="_blank">GitHub</a>
+          <a href="mailto:contact@essence-blog.com" class="social-link">Email</a>
         </div>
-      </article>
-    </main>
 
-    <!-- Footer -->
-    <footer class="site-footer">
-      <p>&copy; 2025 Essence Blog. All rights reserved.</p>
-      <p>Built with ❤️ using vanilla JavaScript, HTML, and CSS</p>
-    </footer>
+        <h2>Subscribe for Updates</h2>
+        <p>
+          Don't miss new posts! Subscribe to get articles delivered to your
+          inbox:
+        </p>
+        <form id="subscribe-form" class="subscribe-box">
+          <input type="email" id="subscribe-email" placeholder="Your email" required />
+          <button type="submit" class="btn">Subscribe</button>
+          <p id="subscribe-message" class="form-message"></p>
+        </form>
 
-    <script src="script.js"></script>
-  </body>
+        <div class="back-link">
+          <a href="index.html">← Back to Home</a>
+        </div>
+      </div>
+    </article>
+  </main>
+
+  <!-- Footer -->
+  <footer class="site-footer">
+    <p>&copy; 2025 Essence Blog. All rights reserved.</p>
+    <p>Built with ❤️ using vanilla JavaScript, HTML, and CSS</p>
+  </footer>
+</body>
+<script src="script.js"></script>
+<script src="public/js/chat-widget.js"></script>
+
 </html>

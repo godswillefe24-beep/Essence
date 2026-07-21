@@ -1,0 +1,200 @@
+/* public/css/chat-widget.css
+   Floating AI chat widget for Essence.
+   Uses CSS custom properties with fallbacks so it inherits your existing
+   theme colors if you define --essence-accent / --essence-text elsewhere,
+   otherwise falls back to a sensible default. */
+
+:root {
+  --essence-chat-accent: var(--essence-accent, #2f3b46);
+  --essence-chat-accent-hover: var(--essence-accent-dark, #232b33);
+  --essence-chat-bg: #ffffff;
+  --essence-chat-text: #1c1f22;
+  --essence-chat-border: #e2e5e8;
+  --essence-chat-user-bg: var(--essence-chat-accent);
+  --essence-chat-assistant-bg: #f2f4f6;
+}
+
+.essence-chat-root {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 9999;
+  font-family: inherit;
+}
+
+.essence-chat-bubble {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: var(--essence-chat-accent);
+  color: #fff;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+
+.essence-chat-bubble:hover {
+  background: var(--essence-chat-accent-hover);
+  transform: scale(1.05);
+}
+
+.essence-chat-bubble:focus-visible {
+  outline: 2px solid var(--essence-chat-accent);
+  outline-offset: 3px;
+}
+
+.essence-chat-panel {
+  position: absolute;
+  bottom: 72px;
+  right: 0;
+  width: 340px;
+  max-width: calc(100vw - 40px);
+  height: 460px;
+  max-height: calc(100vh - 120px);
+  background: var(--essence-chat-bg);
+  border: 1px solid var(--essence-chat-border);
+  border-radius: 14px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+
+.essence-chat-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+}
+
+.essence-chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: var(--essence-chat-accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.essence-chat-close {
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+}
+
+.essence-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.essence-chat-msg {
+  max-width: 85%;
+  padding: 9px 12px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.essence-chat-msg-user {
+  align-self: flex-end;
+  background: var(--essence-chat-user-bg);
+  color: #fff;
+  border-bottom-right-radius: 3px;
+}
+
+.essence-chat-msg-assistant {
+  align-self: flex-start;
+  background: var(--essence-chat-assistant-bg);
+  color: var(--essence-chat-text);
+  border-bottom-left-radius: 3px;
+}
+
+.essence-chat-typing {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.essence-chat-sources {
+  align-self: flex-start;
+  font-size: 11px;
+  color: #8a8f94;
+  padding: 0 4px;
+}
+
+.essence-chat-input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid var(--essence-chat-border);
+}
+
+.essence-chat-input {
+  flex: 1;
+  resize: none;
+  border: 1px solid var(--essence-chat-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13.5px;
+  font-family: inherit;
+  max-height: 120px;
+  min-height: 36px;
+}
+
+.essence-chat-input:focus-visible {
+  outline: 2px solid var(--essence-chat-accent);
+  outline-offset: 1px;
+}
+
+.essence-chat-send {
+  background: var(--essence-chat-accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.essence-chat-send:hover {
+  background: var(--essence-chat-accent-hover);
+}
+
+.essence-chat-send:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .essence-chat-panel,
+  .essence-chat-bubble {
+    transition: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .essence-chat-panel {
+    width: calc(100vw - 32px);
+    right: -4px;
+  }
+}

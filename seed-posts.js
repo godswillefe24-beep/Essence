@@ -38,18 +38,18 @@ const posts = [
   {
     id: 'post4',
     slug: 'post4',
-    title: 'Web Design Best Practices',
-    category: 'Design',
+    title: 'Advanced Customization Techniques',
+    category: 'Tutorial',
     date: new Date('2026-03-25').toISOString(),
-    excerpt: 'Learn essential web design principles and best practices to create stunning, user-friendly websites.'
+    excerpt: 'Master CSS Grid, custom properties, and JavaScript for professional web design.'
   },
   {
     id: 'post5',
     slug: 'post5',
-    title: 'JavaScript Tips and Tricks',
-    category: 'Code',
+    title: 'How Computers Are Made',
+    category: 'Technology',
     date: new Date('2026-04-05').toISOString(),
-    excerpt: 'Explore advanced JavaScript techniques, tips, and tricks to improve your coding skills.'
+    excerpt: 'At some point, everyone looks at a computer and thinks: "There is no way this thing runs on just 0s and 1s." But yes, it absolutely does.'
   },
   {
     id: 'post6',

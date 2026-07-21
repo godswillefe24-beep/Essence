@@ -8,7 +8,11 @@ const urlsToCache = [
   '/posts/post1.html',
   '/posts/post2.html',
   '/posts/post3.html',
-  '/posts/post4.html'
+  '/posts/post4.html',
+  '/posts/post5.html',
+  '/posts/post6.html',
+  '/posts/post7.html',
+  '/posts/post8.html'
 ];
 
 // Install event - cache files

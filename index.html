@@ -34,7 +34,7 @@
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><circle cx='90' cy='90' r='85' fill='%233b82f6' opacity='0.1'/><circle cx='90' cy='90' r='75' fill='none' stroke='%233b82f6' stroke-width='3' opacity='0.3'/><circle cx='90' cy='90' r='65' fill='none' stroke='%233b82f6' stroke-width='3'/><path d='M 65 100 Q 90 60 115 100' stroke='%233b82f6' stroke-width='4' fill='none' stroke-linecap='round'/><circle cx='65' cy='100' r='4' fill='%233b82f6'/><circle cx='90' cy='60' r='4' fill='%233b82f6'/><circle cx='115' cy='100' r='4' fill='%233b82f6'/></svg>" />
   <link rel="manifest" href="manifest.json" />
   <link rel="stylesheet" href="styles.css">
-  <link rel="stylesheet" href="styles-upgrade.css" />
+  <link rel="stylesheet" href="public/css/chat-widget.css">
   <link rel="alternate" type="application/rss+xml" title="Essence RSS" href="/rss.xml" />
   <!-- Favicon as SVG -->
   <link rel="icon" type="image/svg+xml"
@@ -157,7 +157,7 @@
       <article class="featured-post">
         <div class="featured-content">
           <div class="post-badge">Featured</div>
-          <h2><a href="posts/post2.html">Latest Technology News and Innovations</h2>
+          <h2><a href="posts/post2.html">Latest Technology News and Innovations</a></h2>
           <p class="post-meta">
             <span class="meta-date">📅 November 26, 2025</span>
             <span class="meta-reading">⏱️ less than 1</span>
@@ -326,6 +326,21 @@
             </p>
             <a href="posts/post7.html" class="post-link">Read More →</a>
           </article>
+
+          <article class="post-card" data-post-id="8">
+            <div class="post-header">
+              <div class="post-category">Writing</div>
+            </div>
+            <h3>
+              <a href="posts/post8.html">Content is King: The Art of Great Writing</a>
+            </h3>
+            <p class="post-meta">May 2026</p>
+            <p class="post-excerpt">
+              Master the art of content creation and discover how to write
+              compelling, engaging articles.
+            </p>
+            <a href="posts/post8.html" class="post-link">Read More →</a>
+          </article>
         </div>
       </section>
 
@@ -397,8 +412,8 @@
     </div>
   </footer>
 </body>
-<script src="script.js" defer></script>
+<script src="app-optimized.js" defer></script>
 <script src="enhancements.js" defer></script>
-<script src="script-enhancements.js" defer></script>
+<script src="public/js/chat-widget.js"></script>
 
 </html>
