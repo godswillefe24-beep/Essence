@@ -1583,3 +1583,22 @@ console.log(
   "%cUse exportBlogData() or viewDatabase() in console!",
   "color: #668ae6; font-style: italic; font-size: 11px;",
 );
+
+// ==========================================
+// PAGE VIEW TRACKING
+// Records a view against the existing /api/analytics/view/:postId endpoint
+// (this endpoint already existed server-side and worked correctly — it was
+// just never called from any page). Uses the numeric post id from the
+// filename, e.g. posts/post9.html -> "9", matching the same id scheme
+// already used by the comments-section data-post-id attribute.
+// ==========================================
+(function trackPageView() {
+  const match = window.location.pathname.match(/post(\d+)\.html/);
+  if (!match) return;
+  const postId = match[1];
+  fetch(`${API_BASE}/analytics/view/${postId}`, { method: "POST" }).catch(
+    () => {
+      // Non-critical — a missed view count shouldn't disrupt the page.
+    },
+  );
+})();

@@ -12,7 +12,7 @@
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><circle cx='90' cy='90' r='85' fill='%233b82f6' opacity='0.1'/><circle cx='90' cy='90' r='75' fill='none' stroke='%233b82f6' stroke-width='3' opacity='0.3'/><circle cx='90' cy='90' r='65' fill='none' stroke='%233b82f6' stroke-width='3'/><path d='M 65 100 Q 90 60 115 100' stroke='%233b82f6' stroke-width='4' fill='none' stroke-linecap='round'/><circle cx='65' cy='100' r='4' fill='%233b82f6'/><circle cx='90' cy='60' r='4' fill='%233b82f6'/><circle cx='115' cy='100' r='4' fill='%233b82f6'/></svg>" />
     <link rel="manifest" href="../manifest.json" />
     <link rel="stylesheet" href="../styles.css" />
-    <link rel="stylesheet" href="public/css/chat-widget.css">
+    <link rel="stylesheet" href="../public/css/chat-widget.css">
     <!-- Favicon as SVG -->
     <link rel="icon" type="image/svg+xml"
         href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%233b82f6' opacity='0.1'/><circle cx='50' cy='50' r='40' fill='none' stroke='%233b82f6' stroke-width='2' opacity='0.3'/><circle cx='50' cy='50' r='35' fill='none' stroke='%233b82f6' stroke-width='2'/><path d='M 35 55 Q 50 35 65 55' stroke='%233b82f6' stroke-width='2.5' fill='none' stroke-linecap='round'/><circle cx='35' cy='55' r='2' fill='%233b82f6'/><circle cx='50' cy='35' r='2' fill='%233b82f6'/><circle cx='65' cy='55' r='2' fill='%233b82f6'/></svg>" />
@@ -35,9 +35,7 @@
             <h1>Education and Online Learning</h1>
             <main>
 
-                <main>
-
-                    <section>
+                <section>
                         <h2>Introduction</h2>
                         <p>
                             Education is the foundation of personal and professional growth. In recent
@@ -126,26 +124,45 @@
                     </section>
 
                 </main>
-                <footer class="site-footer">
-                    <div class="footer-content">
-                        <div class="footer-section">
-                            <h4>About</h4>
-                            <p>A modern blog built with simplicity in mind.</p>
-                        </div>
-                        <div class="footer-section">
-                            <h4>Pages</h4>
-                            <ul>
-                                <li><a href="../index.html">Home</a></li>
-                                <li><a href="../index.html#posts-section">All Posts</a></li>
-                            </ul>
-                        </div>
+
+                <section class="comments-section" data-post-id="12">
+                    <h3>💬 Comments (<span class="comments-count">0</span>)</h3>
+                    <div class="comments-list"></div>
+                    <div class="comment-form">
+                        <h4>Leave a Comment</h4>
+                        <input type="text" class="comment-name" placeholder="Your name..." />
+                        <textarea class="comment-text" placeholder="Share your thoughts..." rows="4"></textarea>
+                        <button class="comment-submit">Post Comment</button>
                     </div>
-                    <div class="footer-bottom">
-                        <p>&copy; 2026 — Efe. Built with ❤️</p>
-                    </div>
-                </footer>
+                </section>
+            </article>
+
+            <aside class="sidebar">
+                <h3>About</h3>
+                <p>Exploring how digital technology continues to transform modern education.</p>
+            </aside>
+        </main>
+
+        <footer class="site-footer">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h4>About</h4>
+                    <p>A modern blog built with simplicity in mind.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Pages</h4>
+                    <ul>
+                        <li><a href="../index.html">Home</a></li>
+                        <li><a href="../index.html#posts-section">All Posts</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 — Efe. Built with ❤️</p>
+            </div>
+        </footer>
 </body>
 <script src="../script.js"></script>
-<script src="public/js/chat-widget.js"></script>
+<script src="../public/js/chat-widget.js"></script>
 
 </html>

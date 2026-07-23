@@ -341,7 +341,8 @@
         const matchesSearch =
           title.includes(searchTerm) || excerpt.includes(searchTerm);
         const matchesFilter =
-          currentFilter === "all" || category.includes(currentFilter);
+          currentFilter === "all" ||
+          category.includes(currentFilter.toLowerCase());
         post.style.display = matchesSearch && matchesFilter ? "block" : "none";
       });
     };
@@ -581,6 +582,111 @@
     }
   }
 
+  // ============================================
+  // POST MANIFEST
+  // Your real post inventory lives only as static HTML pages + hand-written
+  // homepage cards — data/posts.json (the CMS) doesn't include post9-16,
+  // so it can't be used as the source of truth here. This manifest is that
+  // source of truth instead; update it when you add new posts.
+  // ============================================
+
+  const POST_MANIFEST = [
+    { title: "Welcome to my blog", url: "posts/post1.html", date: "2025-11-26" },
+    { title: "Latest Technology News and Innovations", url: "posts/post2.html", date: "2025-11-26" },
+    { title: "Getting Started with Your Blog", url: "posts/post3.html", date: "2025-11-26" },
+    { title: "Advanced Customization Techniques", url: "posts/post4.html", date: "2025-11-26" },
+    { title: "How Computers Are Made", url: "posts/post5.html", date: "2026-05-05" },
+    { title: "The Biggest Tech Trends Defining 2026", url: "posts/post6.html", date: "2026-05-16" },
+    { title: "Latest Technology Trends Shaping the Future in 2026", url: "posts/post7.html", date: "2026-05-16" },
+    { title: "Content is King: The Art of Great Writing", url: "posts/post8.html", date: "2026-05-01" },
+    { title: "Understanding Digital Marketing", url: "posts/post9.html", date: "2026-07-03" },
+    { title: "AI Tools and Productivity", url: "posts/post10.html", date: "2026-07-04" },
+    { title: "Gaming and Entertainment", url: "posts/post11.html", date: "2026-07-07" },
+    { title: "Education and Online Learning", url: "posts/post12.html", date: "2026-07-07" },
+    { title: "Make Money Online / Online Business", url: "posts/post13.html", date: "2026-07-07" },
+    { title: "How Creativity Intersects with Personal Growth", url: "posts/post14.html", date: "2026-07-07" },
+    { title: "Finding Your Voice Through Self-Expression", url: "posts/post15.html", date: "2026-07-07" },
+    { title: "Rare and Unusual Programming Languages You Probably Haven't Tried", url: "posts/post16.html", date: "2026-07-07" },
+  ];
+
+  // ============================================
+  // RECENT POSTS WIDGET
+  // Genuinely sorted by date from the manifest above — no hardcoded order
+  // to go stale next time a post is added.
+  // ============================================
+
+  function loadRecentPosts() {
+    const recentPostsContainer = document.getElementById("recent-posts");
+    if (!recentPostsContainer) return;
+
+    const recent = [...POST_MANIFEST]
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 3);
+
+    recentPostsContainer.innerHTML = recent
+      .map(
+        (post) => `
+      <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+        <a href="${post.url}" style="color: var(--accent); text-decoration: none; font-weight: 500; font-size: 0.9rem; line-height: 1.4; display: block;">
+          ${post.title}
+        </a>
+      </div>
+    `,
+      )
+      .join("");
+  }
+
+  // ============================================
+  // POPULAR POSTS WIDGET
+  // Now genuinely data-driven: /api/analytics/view/:postId is called from
+  // every post page (see script.js) and increments a real per-post view
+  // counter that already existed server-side. This fetches those counts
+  // and ranks the manifest by them. Posts with zero recorded views yet
+  // (e.g. right after this goes live) simply won't outrank anything.
+  // ============================================
+
+  async function loadPopularPosts() {
+    const container = document.getElementById("popular-posts");
+    if (!container) return;
+
+    try {
+      const response = await fetch("/api/analytics");
+      if (!response.ok) throw new Error("Analytics request failed");
+      const data = await response.json();
+      const postViews = data.postViews || {};
+
+      const ranked = POST_MANIFEST.map((post) => {
+        const idMatch = post.url.match(/post(\d+)\.html/);
+        const postId = idMatch ? idMatch[1] : null;
+        const views = postId ? postViews[postId] || 0 : 0;
+        return { ...post, views };
+      })
+        .filter((p) => p.views > 0)
+        .sort((a, b) => b.views - a.views)
+        .slice(0, 4);
+
+      if (ranked.length === 0) {
+        container.innerHTML =
+          '<p style="font-size:0.85rem; color:var(--muted);">No view data yet — check back soon.</p>';
+        return;
+      }
+
+      container.innerHTML = ranked
+        .map(
+          (p) => `
+        <div style="margin-bottom:10px;">
+          <a href="${p.url}" style="color: var(--accent); font-weight:600;">${p.title}</a>
+          <div style="font-size:0.85rem; color:var(--muted);">${p.views} view${p.views === 1 ? "" : "s"}</div>
+        </div>
+      `,
+        )
+        .join("");
+    } catch (e) {
+      container.innerHTML =
+        '<p style="font-size:0.85rem; color:var(--muted);">Popular posts unavailable right now.</p>';
+    }
+  }
+
   function init() {
     authManager.init();
     initTheme();
@@ -590,6 +696,8 @@
     initComments();
     initAnalytics();
     initServiceWorker();
+    loadRecentPosts();
+    loadPopularPosts();
   }
 
   if (document.readyState === "loading") {
