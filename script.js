@@ -412,10 +412,12 @@ window.addEventListener("scroll", function () {
 
   // Back to top button visibility
   const backToTop = document.querySelector(".back-to-top");
-  if (window.scrollY > 300) {
-    backToTop.classList.add("show");
-  } else {
-    backToTop.classList.remove("show");
+  if (backToTop) {
+    if (window.scrollY > 300) {
+      backToTop.classList.add("show");
+    } else {
+      backToTop.classList.remove("show");
+    }
   }
 });
 
