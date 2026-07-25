@@ -18,6 +18,7 @@
   "author": "Efe",
   "license": "MIT",
   "dependencies": {
+    "@libsql/client": "^0.17.4",
     "autoprefixer": "^10.5.2",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
@@ -29,7 +30,7 @@
     "uuid": "^14.0.1"
   },
   "devDependencies": {
-    "clean-css-cli": "^5.6.3",
+    "clean-css-cli": "^4.0.12",
     "terser": "^5.48.0"
   }
 }
