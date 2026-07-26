@@ -1766,6 +1766,27 @@ body.dark-mode {
   box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
 }
 
+img {
+  width: 100%;
+  height: 150px;
+  -o-object-fit: cover;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-transition: all 0.3s ease;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+}
+
+img:hover {
+  -webkit-transform: scale(1.05);
+  -ms-transform: scale(1.05);
+  transform: scale(1.05);
+  border-color: var(--accent);
+  -webkit-box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+  box-shadow: 0 8px 20px rgba(99, 102, 241, 0.3);
+}
+
 .gallery-message {
   padding: 40px;
   text-align: center;
@@ -4350,4 +4371,3 @@ a:hover {
 .post-content {
   max-width: 100%;
 }
-

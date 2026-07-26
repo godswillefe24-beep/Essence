@@ -62,3 +62,5 @@ CREATE TABLE IF NOT EXISTS site_stats (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     total_likes INTEGER NOT NULL DEFAULT 0
 );
+
+ALTER TABLE posts ADD COLUMN embedding TEXT;

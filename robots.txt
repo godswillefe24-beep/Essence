@@ -1,24 +1,7 @@
 User-agent: *
 Allow: /
-Allow: /index.html
-Allow: /posts/
-Allow: /api/comments
-Allow: /api/subscribe
-Disallow: /admin/
+Disallow: /admin.html
+Disallow: /api/
 Disallow: /data/
-Disallow: /uploads/
 
-# Crawl delay (requests per second)
-Crawl-delay: 1
-
-# Sitemap location
 Sitemap: https://essence-blog.com/sitemap.xml
-
-# Specific rules for common crawlers
-User-agent: Googlebot
-Allow: /
-Crawl-delay: 0
-
-User-agent: Bingbot
-Allow: /
-Crawl-delay: 1
