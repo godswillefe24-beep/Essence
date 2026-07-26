@@ -591,22 +591,87 @@
   // ============================================
 
   const POST_MANIFEST = [
-    { title: "Welcome to my blog", url: "posts/post1.html", date: "2025-11-26" },
-    { title: "Latest Technology News and Innovations", url: "posts/post2.html", date: "2026-03-01" },
-    { title: "Getting Started with Your Blog", url: "posts/post3.html", date: "2025-12-10" },
-    { title: "Advanced Customization Techniques", url: "posts/post4.html", date: "2026-01-15" },
-    { title: "How Computers Are Made (And Why It’s Just 0s and 1s)", url: "posts/post5.html", date: "2026-05-05" },
-    { title: "The Biggest Tech Trends Defining 2026", url: "posts/post6.html", date: "2026-05-16" },
-    { title: "Latest Technology Trends Shaping the Future in 2026", url: "posts/post7.html", date: "2026-05-16" },
-    { title: "The Art of Great Writing", url: "posts/post8.html", date: "2026-07-03" },
-    { title: "Understanding Digital Marketing", url: "posts/post9.html", date: "2026-07-03" },
-    { title: "AI Tools and Productivity", url: "posts/post10.html", date: "2026-07-04" },
-    { title: "Gaming and Entertainment", url: "posts/post11.html", date: "2026-07-07" },
-    { title: "Education and Online Learning", url: "posts/post12.html", date: "2026-07-07" },
-    { title: "Make Money Online / Online Business", url: "posts/post13.html", date: "2026-07-07" },
-    { title: "How Creativity Intersects with Personal Growth", url: "posts/post14.html", date: "2026-07-07" },
-    { title: "Finding Your Voice Through Self-Expression", url: "posts/post15.html", date: "2026-07-07" },
-    { title: "Rare and Unusual Programming Languages You Probably Haven't Tried", url: "posts/post16.html", date: "2026-07-07" },
+    {
+      title: "Welcome to my blog",
+      url: "posts/post1.html",
+      date: "2025-11-26",
+    },
+    {
+      title: "Latest Technology News and Innovations",
+      url: "posts/post2.html",
+      date: "2026-03-01",
+    },
+    {
+      title: "Getting Started with Your Blog",
+      url: "posts/post3.html",
+      date: "2025-12-10",
+    },
+    {
+      title: "Advanced Customization Techniques",
+      url: "posts/post4.html",
+      date: "2026-01-15",
+    },
+    {
+      title: "How Computers Are Made (And Why It’s Just 0s and 1s)",
+      url: "posts/post5.html",
+      date: "2026-05-05",
+    },
+    {
+      title: "The Biggest Tech Trends Defining 2026",
+      url: "posts/post6.html",
+      date: "2026-05-16",
+    },
+    {
+      title: "Latest Technology Trends Shaping the Future in 2026",
+      url: "posts/post7.html",
+      date: "2026-05-16",
+    },
+    {
+      title: "The Art of Great Writing",
+      url: "posts/post8.html",
+      date: "2026-07-03",
+    },
+    {
+      title: "Understanding Digital Marketing",
+      url: "posts/post9.html",
+      date: "2026-07-03",
+    },
+    {
+      title: "AI Tools and Productivity",
+      url: "posts/post10.html",
+      date: "2026-07-04",
+    },
+    {
+      title: "Gaming and Entertainment",
+      url: "posts/post11.html",
+      date: "2026-07-07",
+    },
+    {
+      title: "Education and Online Learning",
+      url: "posts/post12.html",
+      date: "2026-07-07",
+    },
+    {
+      title: "Make Money Online / Online Business",
+      url: "posts/post13.html",
+      date: "2026-07-07",
+    },
+    {
+      title: "How Creativity Intersects with Personal Growth",
+      url: "posts/post14.html",
+      date: "2026-07-07",
+    },
+    {
+      title: "Finding Your Voice Through Self-Expression",
+      url: "posts/post15.html",
+      date: "2026-07-07",
+    },
+    {
+      title:
+        "Rare and Unusual Programming Languages You Probably Haven't Tried",
+      url: "posts/post16.html",
+      date: "2026-07-07",
+    },
   ];
 
   // ============================================
@@ -687,6 +752,58 @@
     }
   }
 
+  function initSubscribe() {
+    const subscribeBtn = document.querySelector(".subscribe-btn");
+    const emailInput = document.querySelector(".email-input");
+    if (!subscribeBtn || !emailInput) return;
+
+    subscribeBtn.addEventListener("click", async () => {
+      const email = emailInput.value.trim();
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+      if (!emailPattern.test(email)) {
+        showNotification("Please enter a valid email address.", "error");
+        return;
+      }
+
+      subscribeBtn.disabled = true;
+      const originalText = subscribeBtn.textContent;
+      subscribeBtn.textContent = "Subscribing...";
+
+      try {
+        const response = await fetch("/api/subscribe", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email }),
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+          showNotification("Subscribed! Thanks for joining.", "success");
+          emailInput.value = "";
+        } else {
+          showNotification(data.error || "Subscription failed.", "error");
+        }
+      } catch (err) {
+        showNotification(
+          "Couldn't reach the server. Please try again.",
+          "error",
+        );
+      } finally {
+        subscribeBtn.disabled = false;
+        subscribeBtn.textContent = originalText;
+      }
+    });
+
+    // Allow pressing Enter in the email field to submit too.
+    emailInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        subscribeBtn.click();
+      }
+    });
+  }
+
   function init() {
     authManager.init();
     initTheme();
@@ -696,6 +813,7 @@
     initComments();
     initAnalytics();
     initServiceWorker();
+    initSubscribe();
     loadRecentPosts();
     loadPopularPosts();
   }
