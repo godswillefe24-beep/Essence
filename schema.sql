@@ -53,14 +53,15 @@ CREATE TABLE IF NOT EXISTS post_views (
     views INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS post_likes (
+    post_id TEXT PRIMARY KEY,
+    likes INTEGER NOT NULL DEFAULT 0
+);
+
 -- Single-row sitewide stats (id is always 1). total_comments is intentionally
 -- NOT stored here — it's derived with COUNT(*) from the comments table on
--- read, so it can never drift the way the old analytics.json counter could
--- (it had separate ++/-- calls on every comment post/delete that could get
--- out of sync if one write succeeded and a related one failed).
+-- read, so it can never drift the way the old analytics.json counter could.
 CREATE TABLE IF NOT EXISTS site_stats (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     total_likes INTEGER NOT NULL DEFAULT 0
 );
-
-ALTER TABLE posts ADD COLUMN embedding TEXT;

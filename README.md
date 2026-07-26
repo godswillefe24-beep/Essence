@@ -1,210 +1,151 @@
-# My Blog - Full Setup Guide
+# Essence Blog
 
-## 📌 Features
+A full-stack personal blog with 16 static post pages, Turso/libSQL persistence, user authentication, admin dashboard, newsletter subscriptions, and an AI chat widget with semantic search.
 
-✅ Static blog with HTML/CSS/JavaScript  
-✅ Node.js/Express backend  
-✅ Comments system with database persistence  
-✅ Newsletter subscription with email notifications  
-✅ Analytics tracking (views, likes, subscribers)  
-✅ Dark mode toggle  
-✅ Responsive design  
-✅ Search and filter posts
+## Features
 
-## 🚀 Quick Start
+- Static HTML post pages with SEO metadata (Open Graph, JSON-LD, canonical URLs)
+- Express REST API backed by [Turso](https://turso.tech) (libSQL)
+- Comments, per-post likes, analytics, newsletter subscriptions
+- User registration/login (JWT)
+- Admin dashboard at `/admin.html`
+- AI chat widget (Groq LLM + Hugging Face embeddings for semantic post search)
+- Dark mode, PWA manifest, service worker, RSS feed
 
-### Prerequisites
+## Prerequisites
 
-- Node.js (v16 or higher)
+- Node.js 18+
 - npm
+- A free Turso database ([turso.tech](https://turso.tech))
+- Optional: Groq API key (chat), Hugging Face token (semantic search), Gmail/SendGrid (email)
 
-### Installation
+## Quick Start
 
-1. **Install dependencies:**
-
-   ```bash
-   npm install
-   ```
-
-2. **Configure environment variables (recommended):**
-   - Create a `.env` file from `.env.example`
-   - Add your Gmail credentials (requires App Password) or other integrations
-   - Set a strong admin password and a random JWT secret
-
-   ```bash
-   copy .env.example .env
-   ```
-
-3. **Start the backend server:**
-
-   ```bash
-   npm start
-   ```
-
-   Server runs on `http://localhost:3001` by default (or the port from your `PORT` environment variable).
-
-4. **Open in browser:**
-   - Navigate to your local blog URL in your browser
-
-### Development Mode
-
-Run the server in watch mode (auto-restarts on changes):
-
-```bash
-npm run dev
-```
-
-## 📁 Project Structure
-
-```
-my-blog/
-├── index.html              # Homepage
-├── script.js               # Frontend JavaScript
-├── styles.css              # Styling
-├── server.js               # Express backend
-├── posts/
-│   ├── post1.html         # Welcome post
-│   ├── post2.html         # Technology news
-│   ├── post3.html         # Getting started
-│   └── post4.html         # Advanced customization
-├── data/                   # JSON database (auto-created)
-│   ├── comments.json
-│   ├── analytics.json
-│   └── subscribers.json
-├── package.json
-├── .env.example
-└── README.md
-```
-
-## 🔧 API Endpoints
-
-### Comments
-
-- `GET /api/comments/:postId` - Get comments for a post
-- `POST /api/comments` - Post new comment
-  ```json
-  { "postId": "1", "name": "John", "text": "Great post!" }
-  ```
-
-### Analytics
-
-- `GET /api/analytics` - Get blog analytics
-- `POST /api/analytics/view/:postId` - Record post view
-- `POST /api/analytics/like` - Record a like
-
-### Subscribe
-
-- `POST /api/subscribe` - Subscribe to newsletter
-  ```json
-  { "email": "user@example.com" }
-  ```
-
-## 📧 Email Configuration
-
-Email notifications require Gmail:
-
-1. Enable 2-factor authentication on your Gmail account
-2. Generate an App Password: https://myaccount.google.com/apppasswords
-3. Add credentials to `.env`
-4. Restart the server
-
-If email isn't configured, subscriptions still work - they just won't send confirmation emails.
-
-## 🗄️ Database
-
-The app uses JSON files for data storage in the `data/` directory:
-
-- `comments.json` - All comments by post
-- `analytics.json` - Views, likes, total comments
-- `subscribers.json` - Email list
-
-Data persists between server restarts.
-
-## 🎨 Frontend Features
-
-- **Dark Mode:** Toggle button in top-right
-- **Search:** Filter posts by title or content
-- **Comments:** Leave comments on featured post
-- **Subscribe:** Newsletter signup
-- **Responsive:** Works on mobile, tablet, desktop
-- **Share:** Social sharing buttons
-
-## 🌐 Deployment
-
-### Static Hosting (Netlify, Vercel, GitHub Pages)
-
-The frontend works as static HTML. Just upload `index.html`, `styles.css`, and `posts/` folder.
-
-### Full Stack Deployment (with backend)
-
-**Heroku Example:**
-
-```bash
-heroku create my-blog
-git push heroku main
-```
-
-**Railway, Render, or other platforms:**
-
-1. Push code to Git repository
-2. Connect to deployment platform
-3. Set environment variables (EMAIL_USER, EMAIL_PASSWORD)
-4. Deploy
-
-## 🔒 Security Notes
-
-- Email credentials should never be in version control (use .env)
-- Comments are stored server-side
-- No authentication required (future enhancement)
-- Input is HTML-escaped to prevent XSS
-
-## 📝 Customization
-
-- Edit `index.html` to change layout
-- Edit `styles.css` for colors and fonts
-- Edit `server.js` to modify API behavior
-- Add more posts in the `posts/` directory
-
-## 🐛 Troubleshooting
-
-**"Cannot find module 'express'"**
+### 1. Install dependencies
 
 ```bash
 npm install
 ```
 
-**"API not available" in browser**
+### 2. Configure environment
 
-- Make sure server is running: `npm start`
-- Check your local blog URL loads
-- Check browser console for CORS errors
+Copy the example file and fill in your values:
 
-**Email not sending**
-
-- Check `.env` configuration
-- Verify Gmail App Password (not regular password)
-- Check spam folder
-
-**Port 3001 already in use**
-Edit server.js:
-
-```javascript
-const PORT = 3002; // Change to another port
+```bash
+copy .env.example .env
 ```
 
-## 📚 Next Steps
+**Required:**
 
-- Add user authentication
-- Create admin dashboard
-- Add image uploads
-- Implement email templates
-- Add category pages
-- SEO optimization
+| Variable | Description |
+|----------|-------------|
+| `TURSO_DATABASE_URL` | Turso database URL (`libsql://...`) |
+| `TURSO_AUTH_TOKEN` | Turso auth token |
+| `JWT_SECRET` | Random secret for JWT signing (e.g. `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) |
+| `ADMIN_PASSWORD` | Password for `/admin.html` login |
 
-## 📄 License
+**Optional:**
 
-MIT
+| Variable | Description |
+|----------|-------------|
+| `GROQ_API_KEY` | AI chat ([console.groq.com](https://console.groq.com/keys)) |
+| `HF_TOKEN` | Semantic search embeddings ([huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)) |
+| `EMAIL_USER`, `EMAIL_PASSWORD` | Gmail app password for subscription emails |
+| `SENDGRID_API_KEY`, `EMAIL_FROM` | SendGrid alternative for emails |
+| `MAILCHIMP_API_KEY`, `MAILCHIMP_LIST_ID` | Mailchimp list sync |
 
----
+### 3. Initialize the database
 
-Built with ❤️ by Efe
+```bash
+node migrate.js
+```
+
+This creates all tables, seeds the 16 post metadata records, and hashes `ADMIN_PASSWORD` into the settings table.
+
+### 4. Enable semantic chat search (optional)
+
+```bash
+node embed-posts.js
+```
+
+Re-run whenever you add or edit posts. Requires `HF_TOKEN`.
+
+### 5. Start the server
+
+```bash
+npm start
+```
+
+Open `http://localhost:3001` (or your `PORT` value).
+
+Development with auto-restart:
+
+```bash
+npm run dev
+```
+
+## Project Structure
+
+```
+Essence/
+├── index.html              # Homepage
+├── about.html
+├── admin.html              # Admin dashboard
+├── script.js               # Unified frontend (all pages)
+├── enhancements.js         # Homepage extras (reading time, breadcrumbs)
+├── styles.css
+├── server.js               # Express API
+├── db.js                   # Turso client
+├── schema.sql              # Database schema
+├── migrate.js              # One-time DB setup
+├── embed-posts.js          # Compute post embeddings
+├── embeddings.js           # Hugging Face helper
+├── routes/chat.js          # AI chat endpoint
+├── posts/post1.html … post16.html
+├── public/js/              # chat-widget.js, post-actions.js
+├── public/css/
+├── render.yaml             # Render deployment config
+└── .env.example
+```
+
+## API Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/posts` | List all posts |
+| GET | `/api/comments/:postId` | Comments for a post |
+| POST | `/api/comments` | Post a comment |
+| POST | `/api/subscribe` | Newsletter signup |
+| GET | `/api/analytics` | Site analytics |
+| POST | `/api/analytics/view/:postId` | Record page view |
+| POST | `/api/auth/register` | User registration |
+| POST | `/api/auth/login` | User login |
+| POST | `/api/chat` | AI chat (streaming SSE) |
+| POST | `/api/admin/login` | Admin login |
+| GET | `/rss.xml` | RSS feed |
+
+Admin routes require `Authorization: Bearer <token>` from `/api/admin/login`.
+
+## Deployment (Render)
+
+1. Connect your Git repository to Render.
+2. Set environment variables listed in `render.yaml` (Turso credentials, API keys).
+3. After first deploy, run `node migrate.js` locally against your production Turso DB (or use Render shell).
+4. Run `node embed-posts.js` for AI search.
+
+`render.yaml` auto-generates `JWT_SECRET` and `ADMIN_PASSWORD`.
+
+## AI Chat Setup
+
+See `INTEGRATION.md` for Groq chat widget setup and `SETUP2.md` for semantic embeddings upgrade.
+
+## Security Notes
+
+- Never commit `.env` — it is gitignored.
+- Admin post HTML is sanitized (script tags, iframes, and inline event handlers are stripped).
+- Comments are escaped on the client; inputs are sanitized server-side.
+- Set a strong `JWT_SECRET` and `ADMIN_PASSWORD`.
+
+## License
+
+MIT — Built by Efe

@@ -6,11 +6,8 @@
 // re-running with corrected data updates cleanly); comments/users/
 // subscribers use INSERT OR IGNORE (so re-running won't create duplicates).
 //
-// IMPORTANT: this file contains your real admin password in plaintext
-// (only so it can be hashed once, on the way into the database). After you
-// run this successfully and confirm login works with the new database,
-// delete this file or at minimum blank out ADMIN_PASSWORD_PLAINTEXT below
-// before committing anything to git.
+// Set ADMIN_PASSWORD in your environment before running (Render generates
+// this automatically if configured in render.yaml).
 
 import fs from "fs";
 import path from "path";
@@ -20,15 +17,8 @@ import { db } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// ---- Your real current admin password, migrated by hashing it once. -----
-// Change this if you'd rather set a new password during migration instead
-// of carrying the old one forward.
-const ADMIN_PASSWORD_PLAINTEXT = "";
-
 async function applySchema() {
   const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
-  // Split on semicolons at end of statements; simple and fine for this schema
-  // (no semicolons appear inside string literals here).
   const statements = schema
     .split(";")
     .map((s) => s.trim())
@@ -38,12 +28,19 @@ async function applySchema() {
     await db.execute(stmt);
   }
   console.log(`Schema applied (${statements.length} statements).`);
+
+  // Idempotent: add embedding column if this database predates semantic search.
+  try {
+    await db.execute("ALTER TABLE posts ADD COLUMN embedding TEXT");
+    console.log("Added posts.embedding column.");
+  } catch (err) {
+    if (!/duplicate column name/i.test(err.message)) {
+      throw err;
+    }
+  }
 }
 
 async function seedPosts() {
-  // The REAL 16 posts, matching what's actually live on the site — not the
-  // old data/posts.json, which had drifted (wrong titles for post4/post5,
-  // missing post9-16, dates that didn't match the actual post pages).
   const posts = [
     {
       id: "1",
@@ -213,23 +210,14 @@ async function seedPosts() {
 }
 
 async function seedComments() {
-  // Your real comments, unchanged.
   const comments = [
     {
-      id: "36a2c5ee-9a24-4385-8eb8-f91879a8791b",
+      id: "sample-comment-1",
       postId: "1",
       userId: null,
-      name: "Efe",
-      text: "That's true",
-      timestamp: "2026-04-26T18:25:41.824Z",
-    },
-    {
-      id: "44debd21-8054-4e44-9d4c-56ee5b18e4d5",
-      postId: "1",
-      userId: "e1c20f3f-e4ca-4a39-8546-0234b6d02e03",
-      name: "Efe",
-      text: "that's informative",
-      timestamp: "2026-04-27T16:35:50.121Z",
+      name: "Reader",
+      text: "Great introduction — looking forward to more posts!",
+      timestamp: new Date().toISOString(),
     },
   ];
 
@@ -240,81 +228,35 @@ async function seedComments() {
       args: [c.id, c.postId, c.userId, c.name, c.text, c.timestamp],
     });
   }
-  console.log(`Seeded ${comments.length} comments.`);
-}
-
-async function seedUsers() {
-  // Your real user account — password is already bcrypt-hashed, carried
-  // forward unchanged (not re-hashed, since that would invalidate the login).
-  const users = [
-    {
-      id: "e1c20f3f-e4ca-4a39-8546-0234b6d02e03",
-      username: "Efe",
-      email: "godswillefe24@gmail.com",
-      password: "$2a$10$p3OA/GAFzsgjxX1/nkHjIu8RMwlhnxDCHGhLTwkFLcWlyQLw9j1Mq",
-      createdAt: "2026-04-18T08:40:11.707Z",
-      bio: "",
-      avatar: null,
-      posts: 0,
-      comments: 1,
-    },
-  ];
-
-  for (const u of users) {
-    await db.execute({
-      sql: `INSERT OR IGNORE INTO users (id, username, email, password, created_at, bio, avatar, posts, comments)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        u.id,
-        u.username,
-        u.email,
-        u.password,
-        u.createdAt,
-        u.bio,
-        u.avatar,
-        u.posts,
-        u.comments,
-      ],
-    });
-  }
-  console.log(`Seeded ${users.length} users.`);
-}
-
-async function seedSubscribers() {
-  const subscribers = [
-    { email: "godswillefe24@gmail.com", date: "2026-05-04T14:46:08.635Z" },
-  ];
-
-  for (const s of subscribers) {
-    await db.execute({
-      sql: `INSERT OR IGNORE INTO subscribers (email, date) VALUES (?, ?)`,
-      args: [s.email, s.date],
-    });
-  }
-  console.log(`Seeded ${subscribers.length} subscribers.`);
+  console.log(`Seeded ${comments.length} sample comment(s).`);
 }
 
 async function seedSettings() {
-  const passwordHash = await bcrypt.hash(ADMIN_PASSWORD_PLAINTEXT, 10);
+  const password = process.env.ADMIN_PASSWORD;
+  if (!password) {
+    console.warn(
+      "ADMIN_PASSWORD not set — skipping admin password seed. " +
+        "Set ADMIN_PASSWORD in your environment and re-run migrate, " +
+        "or set a password via the admin settings panel after first login is configured.",
+    );
+    return;
+  }
 
+  const passwordHash = await bcrypt.hash(password, 10);
   await db.execute({
     sql: `INSERT OR REPLACE INTO settings (id, title, description, admin_password_hash)
           VALUES (1, ?, ?, ?)`,
     args: ["Essence", "A modern blog", passwordHash],
   });
-  console.log(
-    "Settings seeded (admin password hashed, not stored in plaintext).",
-  );
+  console.log("Settings seeded (admin password hashed from ADMIN_PASSWORD env var).");
 }
 
 async function seedSiteStats() {
-  // From your existing analytics.json: totalLikes was 5. totalComments is
-  // no longer stored as a counter — it's derived from the comments table.
   await db.execute({
     sql: `INSERT OR REPLACE INTO site_stats (id, total_likes) VALUES (1, ?)`,
-    args: [5],
+    args: [0],
   });
-  console.log("Site stats seeded (total_likes: 5).");
+  console.log("Site stats seeded (total_likes: 0).");
 }
 
 async function main() {
@@ -322,17 +264,10 @@ async function main() {
   await applySchema();
   await seedPosts();
   await seedComments();
-  await seedUsers();
-  await seedSubscribers();
   await seedSettings();
   await seedSiteStats();
   console.log("\nMigration complete.");
-  console.log(
-    "Verify: log into /admin.html with your existing password, check comments on post1.",
-  );
-  console.log(
-    "\nIMPORTANT: delete this file or blank out ADMIN_PASSWORD_PLAINTEXT before committing to git.",
-  );
+  console.log("Next: node embed-posts.js (after setting HF_TOKEN for AI chat search).");
 }
 
 main().catch((err) => {

@@ -68,6 +68,21 @@ function sanitizeEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) ? trimmed : "";
 }
 
+// Strip script tags, iframes, inline event handlers, and javascript: URLs
+// from admin-supplied HTML before writing post files.
+function stripDangerousHtml(html) {
+  if (typeof html !== "string") return "";
+  return html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/javascript:/gi, "");
+}
+
+function sanitizePostContent(content) {
+  return stripDangerousHtml(sanitizeString(content));
+}
+
 // Rate limiting (simple in-memory — unrelated to persistent storage, left as-is)
 const rateLimitStore = new Map();
 function checkRateLimit(key, maxRequests = 10, windowMs = 60000) {
@@ -469,13 +484,21 @@ app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
+    const sanitizedTitle = sanitizeString(title);
+    const sanitizedCategory = sanitizeString(category || "Uncategorized");
+    const sanitizedContent = sanitizePostContent(content);
+
+    if (!sanitizedTitle || !sanitizedContent) {
+      return res.status(400).json({ error: "Invalid title or content" });
+    }
+
     const postMeta = {
       id,
-      title,
-      category: category || "Uncategorized",
+      title: sanitizedTitle,
+      category: sanitizedCategory,
       date: date || new Date().toISOString(),
       slug: id,
-      excerpt: (content || "").slice(0, 160),
+      excerpt: sanitizedContent.slice(0, 160),
     };
 
     await run(
@@ -509,7 +532,7 @@ app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
         <p class="meta">${new Date(postMeta.date).toLocaleString()} \u2022 ${escapeXml(postMeta.category)}</p>
       </header>
       <section class="content">
-        ${content}
+        ${sanitizedContent}
       </section>
     </article>
     <script src="/script.js" defer></script>
@@ -558,7 +581,7 @@ app.put("/api/admin/posts/:id", verifyAdmin, async (req, res) => {
 
     const sanitizedTitle = sanitizeString(title);
     const sanitizedCategory = sanitizeString(category || "Uncategorized");
-    const sanitizedContent = sanitizeString(content);
+    const sanitizedContent = sanitizePostContent(content);
 
     if (!sanitizedTitle || !sanitizedContent) {
       return res.status(400).json({ error: "Invalid title or content" });
@@ -1224,23 +1247,25 @@ app.post("/api/analytics", (req, res) => {
 
 app.get("/api/admin/stats", verifyAdmin, async (req, res) => {
   try {
-    const [posts, comments, subscribers] = await Promise.all([
-      readPosts(),
-      readComments(),
-      readSubscribers(),
-    ]);
+    const [posts, comments, subscribers, viewSumRow, pageViewTrend] =
+      await Promise.all([
+        readPosts(),
+        readComments(),
+        readSubscribers(),
+        get("SELECT COALESCE(SUM(views), 0) AS total FROM post_views"),
+        getPageViewTrend(),
+      ]);
 
     const stats = {
       totalPosts: posts.length,
       totalComments: comments.length,
       totalSubscribers: subscribers.length,
-      totalViews: analyticsStore.pageViews.length,
+      totalViews: viewSumRow ? viewSumRow.total : 0,
       activeSessions: analyticsStore.sessions.size,
-      viewChange: Math.floor(Math.random() * 40 - 10), // Demo data
       recentPosts: posts.slice(0, 5),
       recentComments: comments.slice(0, 5),
       topCategories: getTopCategories(posts),
-      pageViewTrend: getPageViewTrend(),
+      pageViewTrend,
     };
 
     res.json(stats);
@@ -1293,17 +1318,12 @@ function getTopCategories(posts) {
     .slice(0, 5);
 }
 
-function getPageViewTrend() {
-  const trend = [];
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
-    trend.push({
-      date: date.toISOString().split("T")[0],
-      views: Math.floor(Math.random() * 100) + 20,
-    });
-  }
-  return trend;
+async function getPageViewTrend() {
+  const row = await get("SELECT COALESCE(SUM(views), 0) AS total FROM post_views");
+  const total = row ? row.total : 0;
+  const today = new Date().toISOString().split("T")[0];
+  // Per-post view counts are cumulative (no daily breakdown stored yet).
+  return [{ date: today, views: total }];
 }
 
 app.listen(PORT, HOST, () => {
