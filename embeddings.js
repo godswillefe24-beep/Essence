@@ -1,65 +1,58 @@
 // embeddings.js — shared helper for getting text embeddings from Hugging
-// Face's free Inference API (hosted, not run locally — avoids the RAM cost
-// of loading a model into your own Render process).
+// Face's free Inference API.
+//
+// Uses the official @huggingface/inference client library rather than a
+// hand-rolled fetch() to a raw endpoint URL — HF has restructured their
+// inference routing more than once ("Inference Providers"), and the client
+// library handles that routing correctly regardless of future changes on
+// their end, instead of us needing to track the exact current URL ourselves.
 //
 // Setup:
+//   npm install @huggingface/inference
 //   Get a free token at https://huggingface.co/settings/tokens (no card required)
 //   Add to .env: HF_TOKEN=hf_xxxxxxxxxxxx
 
-const HF_MODEL = "sentence-transformers/all-MiniLM-L6-v2";
-const HF_URL = `https://api-inference.huggingface.co/models/${HF_MODEL}`;
+import { InferenceClient } from "@huggingface/inference";
 
-/**
- * Get a single embedding vector (array of floats) for a piece of text.
- * Handles both response shapes HF's feature-extraction task can return:
- * a flat sentence vector, or a per-token 2D array (mean-pooled here if so).
- * Retries once with wait_for_model on a cold-start 503.
- */
-export async function getEmbedding(text, { retried = false } = {}) {
+const MODEL = "sentence-transformers/all-MiniLM-L6-v2";
+
+let client = null;
+function getClient() {
   if (!process.env.HF_TOKEN) {
     throw new Error("HF_TOKEN environment variable is not set.");
   }
+  if (!client) {
+    client = new InferenceClient(process.env.HF_TOKEN);
+  }
+  return client;
+}
 
-  const response = await fetch(HF_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${process.env.HF_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      inputs: text.slice(0, 8000), // keep well within the model's input limit
-      options: { wait_for_model: true },
-    }),
+/**
+ * Get a single embedding vector (array of floats) for a piece of text.
+ * Handles both response shapes this task can return: a flat sentence
+ * vector, or a per-token 2D array (mean-pooled here if so).
+ */
+export async function getEmbedding(text) {
+  const hf = getClient();
+
+  const result = await hf.featureExtraction({
+    model: MODEL,
+    inputs: text.slice(0, 8000), // keep well within the model's input limit
   });
 
-  if (response.status === 503 && !retried) {
-    // Model is cold-starting on HF's side — wait a moment and retry once.
-    await new Promise((r) => setTimeout(r, 4000));
-    return getEmbedding(text, { retried: true });
-  }
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(
-      `HF embeddings request failed (${response.status}): ${errText}`,
-    );
-  }
-
-  const data = await response.json();
-
   // Flat vector: [0.1, 0.2, ...]
-  if (Array.isArray(data) && typeof data[0] === "number") {
-    return data;
+  if (Array.isArray(result) && typeof result[0] === "number") {
+    return result;
   }
 
   // Per-token vectors: [[...], [...], ...] — mean-pool into one sentence vector.
-  if (Array.isArray(data) && Array.isArray(data[0])) {
-    const dims = data[0].length;
+  if (Array.isArray(result) && Array.isArray(result[0])) {
+    const dims = result[0].length;
     const pooled = new Array(dims).fill(0);
-    for (const tokenVec of data) {
+    for (const tokenVec of result) {
       for (let i = 0; i < dims; i++) pooled[i] += tokenVec[i];
     }
-    return pooled.map((v) => v / data.length);
+    return pooled.map((v) => v / result.length);
   }
 
   throw new Error("Unexpected embedding response shape from Hugging Face.");

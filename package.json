@@ -18,6 +18,7 @@
   "author": "Efe",
   "license": "MIT",
   "dependencies": {
+    "@huggingface/inference": "^4.13.23",
     "@libsql/client": "^0.17.4",
     "autoprefixer": "^10.5.2",
     "bcryptjs": "^2.4.3",

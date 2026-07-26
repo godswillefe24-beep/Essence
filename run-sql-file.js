@@ -23,12 +23,14 @@ if (!fs.existsSync(filename)) {
 async function main() {
   const sql = fs.readFileSync(filename, "utf8");
 
-  // Split into individual statements on semicolons, skipping comment-only
-  // lines and blank statements.
+  // Split into individual statements on semicolons, skipping blank chunks.
+  // (Comment-only lines within a chunk are stripped further below, right
+  // before each statement is executed — a chunk isn't rejected here just
+  // because it happens to *start* with a comment line.)
   const statements = sql
     .split(";")
     .map((s) => s.trim())
-    .filter((s) => s.length > 0 && !s.startsWith("--"));
+    .filter((s) => s.length > 0);
 
   console.log(
     `Running ${statements.length} statement(s) from ${filename}...\n`,
