@@ -1,0 +1,114 @@
+/* public/css/post-actions.css
+   Like + share buttons for individual post pages.
+   Uses the site's real design tokens (--accent, --card, --border, etc.)
+   so it matches the rest of the site and follows dark mode automatically. */
+
+.post-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 32px 0;
+  padding: 16px 20px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.post-like-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-solid);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.post-like-btn:hover {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+
+.post-like-btn.liked {
+  background: linear-gradient(135deg, var(--accent), var(--accent-light));
+  border-color: transparent;
+  color: #ffffff;
+}
+
+.post-like-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.post-like-icon {
+  font-size: 1rem;
+  filter: grayscale(1);
+  opacity: 0.6;
+  transition: all 0.2s ease;
+}
+
+.post-like-btn.liked .post-like-icon {
+  filter: none;
+  opacity: 1;
+}
+
+.post-like-count {
+  min-width: 1.2em;
+  text-align: left;
+}
+
+.post-share {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.post-share-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-right: 4px;
+}
+
+.post-share-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--bg-solid);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.post-share-btn:hover {
+  background: linear-gradient(135deg, var(--accent), var(--accent-light));
+  border-color: transparent;
+  color: #ffffff;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 480px) {
+  .post-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .post-share {
+    justify-content: center;
+  }
+}

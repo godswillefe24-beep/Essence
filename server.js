@@ -337,6 +337,53 @@ app.post("/api/analytics/like", async (req, res) => {
   }
 });
 
+// ---- Per-post likes (separate from the sitewide counter above) ----------
+// The sitewide /api/analytics/like endpoint above only tracks one global
+// number, which doesn't work for a like button that lives on each post.
+// These endpoints track likes per post_id, the same way post_views does.
+
+app.get("/api/analytics/likes/:postId", async (req, res) => {
+  try {
+    const row = await get("SELECT likes FROM post_likes WHERE post_id = ?", [req.params.postId]);
+    res.json({ postId: req.params.postId, likes: row ? row.likes : 0 });
+  } catch (error) {
+    logError("Get post likes", error);
+    res.status(500).json({ error: "Failed to fetch likes" });
+  }
+});
+
+app.post("/api/analytics/like/:postId", async (req, res) => {
+  try {
+    const postId = req.params.postId;
+    await run(
+      `INSERT INTO post_likes (post_id, likes) VALUES (?, 1)
+       ON CONFLICT(post_id) DO UPDATE SET likes = likes + 1`,
+      [postId],
+    );
+    const row = await get("SELECT likes FROM post_likes WHERE post_id = ?", [postId]);
+    res.json({ postId, likes: row.likes });
+  } catch (error) {
+    logError("Like post", error);
+    res.status(500).json({ error: "Failed to record like" });
+  }
+});
+
+app.post("/api/analytics/unlike/:postId", async (req, res) => {
+  try {
+    const postId = req.params.postId;
+    await run(
+      `INSERT INTO post_likes (post_id, likes) VALUES (?, 0)
+       ON CONFLICT(post_id) DO UPDATE SET likes = MAX(likes - 1, 0)`,
+      [postId],
+    );
+    const row = await get("SELECT likes FROM post_likes WHERE post_id = ?", [postId]);
+    res.json({ postId, likes: row.likes });
+  } catch (error) {
+    logError("Unlike post", error);
+    res.status(500).json({ error: "Failed to record unlike" });
+  }
+});
+
 // ==========================================
 // POSTS: Public list and admin create/delete
 // ==========================================
