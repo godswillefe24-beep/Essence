@@ -46,3 +46,38 @@ export function matchesFilter(postCategory, filterValue) {
   if (!postCategory) return false;
   return postCategory.toLowerCase().includes(filterValue.toLowerCase());
 }
+
+/**
+ * Validates a comment submission using the same rules as POST /api/comments
+ * in server.js. Returns sanitized values on success so the caller doesn't
+ * have to sanitize twice.
+ */
+export function validateComment({ postId, name, text }) {
+  const sanitizedPostId = sanitizeString(postId);
+  const sanitizedName = sanitizeString(name || "Anonymous");
+  const sanitizedText = sanitizeString(text);
+
+  if (!sanitizedPostId || !sanitizedText || sanitizedText.length < 2) {
+    return {
+      valid: false,
+      error: "Missing or invalid required fields (name, text required, min 2 chars)",
+    };
+  }
+
+  return {
+    valid: true,
+    sanitized: { postId: sanitizedPostId, name: sanitizedName, text: sanitizedText },
+  };
+}
+
+/**
+ * Validates a newsletter subscription email using the same rules as
+ * POST /api/subscribe in server.js.
+ */
+export function validateSubscribeEmail(email) {
+  const sanitized = sanitizeEmail(email);
+  if (!sanitized) {
+    return { valid: false, error: "Invalid email address" };
+  }
+  return { valid: true, sanitized };
+}
