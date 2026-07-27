@@ -219,13 +219,28 @@ async function loadDashboardData() {
     const response = await fetch(`${API}/analytics`);
     if (response.ok) {
       const data = await response.json();
-      document.getElementById("stat-posts").textContent = 4;
+      document.getElementById("stat-posts").textContent = data.totalPosts || 0;
       document.getElementById("stat-comments").textContent =
         data.totalComments || 0;
       document.getElementById("stat-likes").textContent = data.totalLikes || 0;
       document.getElementById("stat-subscribers").textContent =
         data.totalSubscribers || 0;
     }
+
+    // Top posts by views / likes (admin-only endpoint, has richer data)
+    try {
+      const statsRes = await fetch(`${API}/admin/stats`, {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      });
+      if (statsRes.ok) {
+        const stats = await statsRes.json();
+        renderTopPostsList("top-views-list", stats.topPostsByViews, "views");
+        renderTopPostsList("top-likes-list", stats.topPostsByLikes, "likes");
+      }
+    } catch (statsErr) {
+      console.log("Could not load top posts stats:", statsErr.message);
+    }
+
     // Load current settings to prefill form
     try {
       const sres = await fetch(`${API}/admin/settings`, {
@@ -245,11 +260,37 @@ async function loadDashboardData() {
   } catch (e) {
     console.log("Could not load analytics:", e.message);
     // Set defaults
-    document.getElementById("stat-posts").textContent = 4;
+    document.getElementById("stat-posts").textContent = 0;
     document.getElementById("stat-comments").textContent = 0;
     document.getElementById("stat-likes").textContent = 0;
     document.getElementById("stat-subscribers").textContent = 0;
   }
+}
+
+function renderTopPostsList(containerId, items, metricLabel) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  if (!items || items.length === 0) {
+    container.innerHTML =
+      '<p style="opacity: 0.7; padding: 12px 0;">No data yet.</p>';
+    return;
+  }
+
+  container.innerHTML = items
+    .map(
+      (item) => `
+    <div class="item">
+      <div class="item-info">
+        <h3>${item.title}</h3>
+      </div>
+      <div class="item-actions">
+        <strong>${item[metricLabel]}</strong>&nbsp;${metricLabel}
+      </div>
+    </div>
+  `,
+    )
+    .join("");
 }
 
 async function loadPosts() {

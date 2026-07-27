@@ -10,6 +10,7 @@ import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { all, get, run } from "./db.js";
+import { sanitizeString, sanitizeEmail, escapeXml } from "./utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -57,16 +58,9 @@ function logInfo(context, message) {
   console.log(`[INFO] ${context}: ${message}`);
 }
 
-function sanitizeString(str) {
-  if (typeof str !== "string") return "";
-  return str.trim().substring(0, 5000);
-}
-
-function sanitizeEmail(email) {
-  if (typeof email !== "string") return "";
-  const trimmed = email.trim().toLowerCase();
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) ? trimmed : "";
-}
+// sanitizeString, sanitizeEmail, escapeXml moved to utils.js so they can be
+// unit tested without importing this whole file (which connects to Turso
+// and starts the server at import time).
 
 // Strip script tags, iframes, inline event handlers, and javascript: URLs
 // from admin-supplied HTML before writing post files.
@@ -300,11 +294,12 @@ app.delete("/api/admin/comments/:id", verifyAdmin, async (req, res) => {
 // ==========================================
 app.get("/api/analytics", async (req, res) => {
   try {
-    const [statsRow, commentCountRow, subscribers, viewRows] = await Promise.all([
-      get("SELECT total_likes FROM site_stats WHERE id = 1"),
+    const [likesSumRow, commentCountRow, subscribers, viewRows, postsCountRow] = await Promise.all([
+      get("SELECT SUM(likes) as total FROM post_likes"),
       get("SELECT COUNT(*) as count FROM comments"),
       readSubscribers(),
       all("SELECT post_id, views FROM post_views"),
+      get("SELECT COUNT(*) as count FROM posts"),
     ]);
 
     const postViews = {};
@@ -314,9 +309,10 @@ app.get("/api/analytics", async (req, res) => {
 
     res.json({
       postViews,
-      totalLikes: statsRow ? statsRow.total_likes : 0,
+      totalLikes: likesSumRow?.total || 0,
       totalComments: commentCountRow ? commentCountRow.count : 0,
       totalSubscribers: subscribers.length,
+      totalPosts: postsCountRow?.count || 0,
     });
   } catch (error) {
     logError("Get analytics", error);
@@ -1190,23 +1186,7 @@ app.get("/rss.xml", (req, res) => {
   }
 });
 
-function escapeXml(unsafe) {
-  if (!unsafe) return "";
-  return unsafe.replace(/[<>&'\"]/g, function (c) {
-    switch (c) {
-      case "<":
-        return "&lt;";
-      case ">":
-        return "&gt;";
-      case "&":
-        return "&amp;";
-      case "'":
-        return "&apos;";
-      case '"':
-        return "&quot;";
-    }
-  });
-}
+// escapeXml moved to utils.js
 
 // ==========================================
 // ANALYTICS & STATS ENDPOINTS
@@ -1247,14 +1227,37 @@ app.post("/api/analytics", (req, res) => {
 
 app.get("/api/admin/stats", verifyAdmin, async (req, res) => {
   try {
-    const [posts, comments, subscribers, viewSumRow, pageViewTrend] =
+    const [posts, comments, subscribers, viewSumRow, pageViewTrend, topViewRows, topLikeRows] =
       await Promise.all([
         readPosts(),
         readComments(),
         readSubscribers(),
         get("SELECT COALESCE(SUM(views), 0) AS total FROM post_views"),
         getPageViewTrend(),
+        all("SELECT post_id, views FROM post_views ORDER BY views DESC LIMIT 5"),
+        all("SELECT post_id, likes FROM post_likes ORDER BY likes DESC LIMIT 5"),
       ]);
+
+    const postTitleById = {};
+    posts.forEach((p) => {
+      postTitleById[p.id] = p.title;
+    });
+
+    const topPostsByViews = topViewRows
+      .filter((r) => r.views > 0)
+      .map((r) => ({
+        postId: r.post_id,
+        title: postTitleById[r.post_id] || `Post ${r.post_id}`,
+        views: r.views,
+      }));
+
+    const topPostsByLikes = topLikeRows
+      .filter((r) => r.likes > 0)
+      .map((r) => ({
+        postId: r.post_id,
+        title: postTitleById[r.post_id] || `Post ${r.post_id}`,
+        likes: r.likes,
+      }));
 
     const stats = {
       totalPosts: posts.length,
@@ -1265,6 +1268,8 @@ app.get("/api/admin/stats", verifyAdmin, async (req, res) => {
       recentPosts: posts.slice(0, 5),
       recentComments: comments.slice(0, 5),
       topCategories: getTopCategories(posts),
+      topPostsByViews,
+      topPostsByLikes,
       pageViewTrend,
     };
 
