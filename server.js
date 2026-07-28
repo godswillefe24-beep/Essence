@@ -158,7 +158,7 @@ function mapComment(row) {
 }
 
 async function readComments() {
-  const rows = await all("SELECT * FROM comments ORDER BY timestamp ASC");
+  const rows = await all("SELECT * FROM comments ORDER BY timestamp DESC");
   return rows.map(mapComment);
 }
 
@@ -181,7 +181,9 @@ async function readSubscribers() {
 }
 
 async function getAdminPasswordHash() {
-  const row = await get("SELECT admin_password_hash FROM settings WHERE id = 1");
+  const row = await get(
+    "SELECT admin_password_hash FROM settings WHERE id = 1",
+  );
   return row ? row.admin_password_hash : null;
 }
 
@@ -190,9 +192,10 @@ async function getAdminPasswordHash() {
 // ==========================================
 app.get("/api/comments/:postId", async (req, res) => {
   try {
-    const rows = await all("SELECT * FROM comments WHERE post_id = ? ORDER BY timestamp ASC", [
-      req.params.postId,
-    ]);
+    const rows = await all(
+      "SELECT * FROM comments WHERE post_id = ? ORDER BY timestamp DESC",
+      [req.params.postId],
+    );
     res.json(rows.map(mapComment));
   } catch (error) {
     logError("Get comments", error);
@@ -250,11 +253,20 @@ app.post("/api/comments", async (req, res) => {
 
     await run(
       `INSERT INTO comments (id, post_id, user_id, name, text, timestamp) VALUES (?, ?, ?, ?, ?, ?)`,
-      [newComment.id, newComment.postId, newComment.userId, newComment.name, newComment.text, newComment.timestamp],
+      [
+        newComment.id,
+        newComment.postId,
+        newComment.userId,
+        newComment.name,
+        newComment.text,
+        newComment.timestamp,
+      ],
     );
 
     if (userId) {
-      await run("UPDATE users SET comments = comments + 1 WHERE id = ?", [userId]);
+      await run("UPDATE users SET comments = comments + 1 WHERE id = ?", [
+        userId,
+      ]);
     }
 
     logInfo("Comment", `Posted on post ${sanitizedPostId}`);
@@ -278,7 +290,9 @@ app.get("/api/admin/comments", verifyAdmin, async (req, res) => {
 // API: Delete a comment (admin only)
 app.delete("/api/admin/comments/:id", verifyAdmin, async (req, res) => {
   try {
-    const { rowsAffected } = await run("DELETE FROM comments WHERE id = ?", [req.params.id]);
+    const { rowsAffected } = await run("DELETE FROM comments WHERE id = ?", [
+      req.params.id,
+    ]);
     if (rowsAffected === 0) {
       return res.status(404).json({ error: "Comment not found" });
     }
@@ -294,13 +308,14 @@ app.delete("/api/admin/comments/:id", verifyAdmin, async (req, res) => {
 // ==========================================
 app.get("/api/analytics", async (req, res) => {
   try {
-    const [likesSumRow, commentCountRow, subscribers, viewRows, postsCountRow] = await Promise.all([
-      get("SELECT SUM(likes) as total FROM post_likes"),
-      get("SELECT COUNT(*) as count FROM comments"),
-      readSubscribers(),
-      all("SELECT post_id, views FROM post_views"),
-      get("SELECT COUNT(*) as count FROM posts"),
-    ]);
+    const [likesSumRow, commentCountRow, subscribers, viewRows, postsCountRow] =
+      await Promise.all([
+        get("SELECT SUM(likes) as total FROM post_likes"),
+        get("SELECT COUNT(*) as count FROM comments"),
+        readSubscribers(),
+        all("SELECT post_id, views FROM post_views"),
+        get("SELECT COUNT(*) as count FROM posts"),
+      ]);
 
     const postViews = {};
     viewRows.forEach((r) => {
@@ -339,7 +354,9 @@ app.post("/api/analytics/view/:postId", async (req, res) => {
 // API: Like a post
 app.post("/api/analytics/like", async (req, res) => {
   try {
-    await run("UPDATE site_stats SET total_likes = total_likes + 1 WHERE id = 1");
+    await run(
+      "UPDATE site_stats SET total_likes = total_likes + 1 WHERE id = 1",
+    );
     const row = await get("SELECT total_likes FROM site_stats WHERE id = 1");
     res.json({ totalLikes: row.total_likes });
   } catch (error) {
@@ -355,7 +372,9 @@ app.post("/api/analytics/like", async (req, res) => {
 
 app.get("/api/analytics/likes/:postId", async (req, res) => {
   try {
-    const row = await get("SELECT likes FROM post_likes WHERE post_id = ?", [req.params.postId]);
+    const row = await get("SELECT likes FROM post_likes WHERE post_id = ?", [
+      req.params.postId,
+    ]);
     res.json({ postId: req.params.postId, likes: row ? row.likes : 0 });
   } catch (error) {
     logError("Get post likes", error);
@@ -371,7 +390,9 @@ app.post("/api/analytics/like/:postId", async (req, res) => {
        ON CONFLICT(post_id) DO UPDATE SET likes = likes + 1`,
       [postId],
     );
-    const row = await get("SELECT likes FROM post_likes WHERE post_id = ?", [postId]);
+    const row = await get("SELECT likes FROM post_likes WHERE post_id = ?", [
+      postId,
+    ]);
     res.json({ postId, likes: row.likes });
   } catch (error) {
     logError("Like post", error);
@@ -387,7 +408,9 @@ app.post("/api/analytics/unlike/:postId", async (req, res) => {
        ON CONFLICT(post_id) DO UPDATE SET likes = MAX(likes - 1, 0)`,
       [postId],
     );
-    const row = await get("SELECT likes FROM post_likes WHERE post_id = ?", [postId]);
+    const row = await get("SELECT likes FROM post_likes WHERE post_id = ?", [
+      postId,
+    ]);
     res.json({ postId, likes: row.likes });
   } catch (error) {
     logError("Unlike post", error);
@@ -500,7 +523,15 @@ app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
     await run(
       `INSERT OR REPLACE INTO posts (id, slug, title, category, date, excerpt, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [postMeta.id, postMeta.slug, postMeta.title, postMeta.category, postMeta.date, postMeta.excerpt, new Date().toISOString()],
+      [
+        postMeta.id,
+        postMeta.slug,
+        postMeta.title,
+        postMeta.category,
+        postMeta.date,
+        postMeta.excerpt,
+        new Date().toISOString(),
+      ],
     );
 
     const postsDir = path.join(__dirname, "posts");
@@ -548,7 +579,10 @@ app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
 app.delete("/api/admin/posts/:id", verifyAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const post = await get("SELECT * FROM posts WHERE id = ? OR slug = ?", [id, id]);
+    const post = await get("SELECT * FROM posts WHERE id = ? OR slug = ?", [
+      id,
+      id,
+    ]);
     if (!post) return res.status(404).json({ error: "Post not found" });
 
     await run("DELETE FROM posts WHERE id = ?", [post.id]);
@@ -583,7 +617,10 @@ app.put("/api/admin/posts/:id", verifyAdmin, async (req, res) => {
       return res.status(400).json({ error: "Invalid title or content" });
     }
 
-    const post = await get("SELECT * FROM posts WHERE id = ? OR slug = ?", [id, id]);
+    const post = await get("SELECT * FROM posts WHERE id = ? OR slug = ?", [
+      id,
+      id,
+    ]);
     if (!post) {
       return res.status(404).json({ error: "Post not found" });
     }
@@ -591,7 +628,13 @@ app.put("/api/admin/posts/:id", verifyAdmin, async (req, res) => {
     const excerpt = sanitizedContent.slice(0, 160);
     await run(
       `UPDATE posts SET title = ?, category = ?, excerpt = ?, updated_at = ? WHERE id = ?`,
-      [sanitizedTitle, sanitizedCategory, excerpt, new Date().toISOString(), post.id],
+      [
+        sanitizedTitle,
+        sanitizedCategory,
+        excerpt,
+        new Date().toISOString(),
+        post.id,
+      ],
     );
 
     const postsDir = path.join(__dirname, "posts");
@@ -672,13 +715,18 @@ app.post("/api/subscribe", async (req, res) => {
       });
     }
 
-    const existing = await get("SELECT id FROM subscribers WHERE email = ?", [sanitizedEmail]);
+    const existing = await get("SELECT id FROM subscribers WHERE email = ?", [
+      sanitizedEmail,
+    ]);
     if (existing) {
       return res.status(400).json({ error: "Email already subscribed" });
     }
 
     const subscribedAt = new Date().toISOString();
-    await run("INSERT INTO subscribers (email, date) VALUES (?, ?)", [sanitizedEmail, subscribedAt]);
+    await run("INSERT INTO subscribers (email, date) VALUES (?, ?)", [
+      sanitizedEmail,
+      subscribedAt,
+    ]);
 
     logInfo("Subscribe", `New subscriber: ${sanitizedEmail}`);
 
@@ -778,13 +826,18 @@ app.post("/api/auth/register", async (req, res) => {
       return res.status(400).json({ error: "Passwords do not match" });
     }
     if (password.length < 6) {
-      return res.status(400).json({ error: "Password must be at least 6 characters" });
+      return res
+        .status(400)
+        .json({ error: "Password must be at least 6 characters" });
     }
     if (!email.includes("@")) {
       return res.status(400).json({ error: "Invalid email address" });
     }
 
-    const existing = await get("SELECT id FROM users WHERE email = ? OR username = ?", [email, username]);
+    const existing = await get(
+      "SELECT id FROM users WHERE email = ? OR username = ?",
+      [email, username],
+    );
     if (existing) {
       return res.status(400).json({ error: "User already exists" });
     }
@@ -806,7 +859,17 @@ app.post("/api/auth/register", async (req, res) => {
     await run(
       `INSERT INTO users (id, username, email, password, created_at, bio, avatar, posts, comments)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [newUser.id, newUser.username, newUser.email, newUser.password, newUser.createdAt, newUser.bio, newUser.avatar, newUser.posts, newUser.comments],
+      [
+        newUser.id,
+        newUser.username,
+        newUser.email,
+        newUser.password,
+        newUser.createdAt,
+        newUser.bio,
+        newUser.avatar,
+        newUser.posts,
+        newUser.comments,
+      ],
     );
 
     const token = jwt.sign(
@@ -914,7 +977,9 @@ app.post("/api/auth/validate", async (req, res) => {
 
 app.get("/api/users/:username", async (req, res) => {
   try {
-    const row = await get("SELECT * FROM users WHERE username = ?", [req.params.username]);
+    const row = await get("SELECT * FROM users WHERE username = ?", [
+      req.params.username,
+    ]);
     if (!row) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -950,7 +1015,9 @@ app.put("/api/users/profile/:id", async (req, res) => {
     }
 
     const { bio } = req.body;
-    const existing = await get("SELECT * FROM users WHERE id = ?", [req.params.id]);
+    const existing = await get("SELECT * FROM users WHERE id = ?", [
+      req.params.id,
+    ]);
     if (!existing) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -1042,7 +1109,9 @@ function verifyAdmin(req, res, next) {
 app.get("/api/admin/subscribers", verifyAdmin, async (req, res) => {
   try {
     const subscribers = await readSubscribers();
-    res.json(subscribers.map((s) => ({ id: s.id, email: s.email, date: s.date })));
+    res.json(
+      subscribers.map((s) => ({ id: s.id, email: s.email, date: s.date })),
+    );
   } catch (error) {
     logError("Get subscribers", error);
     res.status(500).json({ error: "Failed to fetch subscribers" });
@@ -1056,7 +1125,9 @@ app.get("/api/admin/subscribers", verifyAdmin, async (req, res) => {
 // just echoes back whatever `id` the GET response provided.
 app.delete("/api/admin/subscribers/:id", verifyAdmin, async (req, res) => {
   try {
-    const { rowsAffected } = await run("DELETE FROM subscribers WHERE id = ?", [req.params.id]);
+    const { rowsAffected } = await run("DELETE FROM subscribers WHERE id = ?", [
+      req.params.id,
+    ]);
     if (rowsAffected === 0) {
       return res.status(404).json({ error: "Subscriber not found" });
     }
@@ -1077,7 +1148,10 @@ app.get("/api/admin/subscribers/export", verifyAdmin, async (req, res) => {
 
     const csv = rows.join("\n");
     res.setHeader("Content-Type", "text/csv");
-    res.setHeader("Content-Disposition", 'attachment; filename="subscribers.csv"');
+    res.setHeader(
+      "Content-Disposition",
+      'attachment; filename="subscribers.csv"',
+    );
     res.send(csv);
   } catch (error) {
     logError("Export subscribers", error);
@@ -1096,7 +1170,9 @@ app.post("/api/admin/settings", verifyAdmin, async (req, res) => {
 
     const newTitle = title || current?.title || "Essence";
     const newDescription = description || current?.description || "";
-    const newHash = password ? await bcrypt.hash(password, 10) : current?.admin_password_hash;
+    const newHash = password
+      ? await bcrypt.hash(password, 10)
+      : current?.admin_password_hash;
 
     await run(
       `INSERT OR REPLACE INTO settings (id, title, description, admin_password_hash) VALUES (1, ?, ?, ?)`,
@@ -1142,7 +1218,8 @@ app.get("/rss.xml", (req, res) => {
       const content = fs.readFileSync(fullPath, "utf8");
 
       let titleMatch = content.match(/<title>([^<]+)<\/title>/i);
-      const title = titleMatch && titleMatch[1] ? titleMatch[1].trim() : filename;
+      const title =
+        titleMatch && titleMatch[1] ? titleMatch[1].trim() : filename;
 
       let descMatch = content.match(
         /<meta\s+name=["']description["']\s+content=["']([^"']+)["']\s*\/>/i,
@@ -1155,7 +1232,9 @@ app.get("/rss.xml", (req, res) => {
       const description = descMatch && descMatch[1] ? descMatch[1].trim() : "";
 
       let dateMatch = content.match(/"datePublished"\s*:\s*"([^"]+)"/i);
-      let pubDate = dateMatch ? new Date(dateMatch[1]) : fs.statSync(fullPath).birthtime;
+      let pubDate = dateMatch
+        ? new Date(dateMatch[1])
+        : fs.statSync(fullPath).birthtime;
 
       return {
         title,
@@ -1168,7 +1247,8 @@ app.get("/rss.xml", (req, res) => {
 
     const channelTitle = "Essence";
     const channelLink = "https://essence-blog.com/";
-    const channelDesc = "A modern blog with insights, stories, and ideas on technology and design.";
+    const channelDesc =
+      "A modern blog with insights, stories, and ideas on technology and design.";
 
     let rss = `<?xml version="1.0" encoding="UTF-8"?>\n<rss version="2.0">\n  <channel>\n    <title>${channelTitle}</title>\n    <link>${channelLink}</link>\n    <description>${channelDesc}</description>\n    <language>en-us</language>\n    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>\n`;
 
@@ -1227,16 +1307,23 @@ app.post("/api/analytics", (req, res) => {
 
 app.get("/api/admin/stats", verifyAdmin, async (req, res) => {
   try {
-    const [posts, comments, subscribers, viewSumRow, pageViewTrend, topViewRows, topLikeRows] =
-      await Promise.all([
-        readPosts(),
-        readComments(),
-        readSubscribers(),
-        get("SELECT COALESCE(SUM(views), 0) AS total FROM post_views"),
-        getPageViewTrend(),
-        all("SELECT post_id, views FROM post_views ORDER BY views DESC LIMIT 5"),
-        all("SELECT post_id, likes FROM post_likes ORDER BY likes DESC LIMIT 5"),
-      ]);
+    const [
+      posts,
+      comments,
+      subscribers,
+      viewSumRow,
+      pageViewTrend,
+      topViewRows,
+      topLikeRows,
+    ] = await Promise.all([
+      readPosts(),
+      readComments(),
+      readSubscribers(),
+      get("SELECT COALESCE(SUM(views), 0) AS total FROM post_views"),
+      getPageViewTrend(),
+      all("SELECT post_id, views FROM post_views ORDER BY views DESC LIMIT 5"),
+      all("SELECT post_id, likes FROM post_likes ORDER BY likes DESC LIMIT 5"),
+    ]);
 
     const postTitleById = {};
     posts.forEach((p) => {
@@ -1324,7 +1411,9 @@ function getTopCategories(posts) {
 }
 
 async function getPageViewTrend() {
-  const row = await get("SELECT COALESCE(SUM(views), 0) AS total FROM post_views");
+  const row = await get(
+    "SELECT COALESCE(SUM(views), 0) AS total FROM post_views",
+  );
   const total = row ? row.total : 0;
   const today = new Date().toISOString().split("T")[0];
   // Per-post view counts are cumulative (no daily breakdown stored yet).
