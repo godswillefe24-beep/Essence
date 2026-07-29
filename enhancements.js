@@ -216,46 +216,9 @@ function initializeSocialSharing() {
 
 // ====================================================
 // TABLE OF CONTENTS
+// (removed — script.js's generateTOCAndAuthor() replaces this; see note
+// in the init() function below)
 // ====================================================
-
-function generateTableOfContents() {
-  // Scoped to the article/main container the TOC gets inserted into, not
-  // the whole document — previously this scanned every h2/h3 on the page
-  // (nav, login modal, comments, post grid, etc.), which is harmless on a
-  // single-post page but produces a huge, irrelevant list on pages like
-  // index.html that contain many unrelated headings.
-  const article =
-    document.querySelector("article") || document.querySelector("main");
-  if (!article) return;
-
-  const headings = article.querySelectorAll("h2, h3");
-
-  if (headings.length === 0) return;
-
-  const tocContainer = document.createElement("div");
-  tocContainer.className = "toc";
-
-  let tocHTML =
-    '<div class="toc-title">📋 Table of Contents</div><ul class="toc-list">';
-
-  headings.forEach((heading, index) => {
-    if (!heading.id) {
-      heading.id = `heading-${index}`;
-    }
-
-    const level = parseInt(heading.tagName[1]);
-    const indent = (level - 2) * 20;
-
-    tocHTML += `<li style="margin-left: ${indent}px;">
-      <a href="#${heading.id}">${heading.innerText}</a>
-    </li>`;
-  });
-
-  tocHTML += "</ul>";
-  tocContainer.innerHTML = tocHTML;
-
-  article.insertAdjacentElement("afterbegin", tocContainer);
-}
 
 // ====================================================
 // ADVANCED SEARCH & FILTERING
@@ -496,7 +459,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // Enhance existing features
   enhancePostMetadata();
   initializeSocialSharing();
-  generateTableOfContents();
+  // generateTableOfContents() removed — script.js now has its own TOC
+  // generator (generateTOCAndAuthor, produces "On this page") that's
+  // better-engineered: correctly scoped to the article from the start,
+  // has its own duplicate-insertion guard, and adds smooth-scroll to the
+  // links. Having both running caused two separate TOC boxes to appear
+  // stacked on the same page.
   initLazyLoading();
   initKeyboardShortcuts();
   initAdvancedSearch();
