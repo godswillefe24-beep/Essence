@@ -4,6 +4,7 @@
   class BlogDatabase {
     constructor() {
       this.dbName = "BlogDB";
+      this.cache = null;
       this.init();
     }
 
@@ -20,14 +21,20 @@
         };
         localStorage.setItem("blog_data", JSON.stringify(defaultData));
       }
+      // Eagerly cache on init
+      this.cache = JSON.parse(localStorage.getItem("blog_data") || "{}");
     }
 
     getData() {
-      return JSON.parse(localStorage.getItem("blog_data") || "{}") || {};
+      // Return cached data, only parse if cache is stale
+      if (this.cache) return this.cache;
+      this.cache = JSON.parse(localStorage.getItem("blog_data") || "{}");
+      return this.cache;
     }
 
     saveData(data) {
       data.saveTime = new Date().toLocaleString();
+      this.cache = data;
       localStorage.setItem("blog_data", JSON.stringify(data));
     }
 
@@ -329,21 +336,34 @@
       document.getElementById("popular-tags") ||
       document.querySelector(".sidebar-widget .tags");
     let currentFilter = "all";
+    let postCache = null;
+
+    const buildPostCache = () => {
+      // Cache post data on first load to avoid repeated DOM queries
+      postCache = Array.from(document.querySelectorAll(".post-card")).map(
+        (post) => ({
+          element: post,
+          title: (post.querySelector("h3")?.textContent || "").toLowerCase(),
+          category: (
+            post.querySelector(".post-category")?.textContent || ""
+          ).toLowerCase(),
+          excerpt: (
+            post.querySelector(".post-excerpt")?.textContent || ""
+          ).toLowerCase(),
+        })
+      );
+    };
 
     const filterAndSearchPosts = () => {
+      if (!postCache) buildPostCache();
       const searchTerm = searchInput?.value.toLowerCase() || "";
-      document.querySelectorAll(".post-card").forEach((post) => {
-        const title = post.querySelector("h3")?.textContent.toLowerCase() || "";
-        const category =
-          post.querySelector(".post-category")?.textContent.toLowerCase() || "";
-        const excerpt =
-          post.querySelector(".post-excerpt")?.textContent.toLowerCase() || "";
+
+      postCache.forEach(({ element, title, category, excerpt }) => {
         const matchesSearch =
           title.includes(searchTerm) || excerpt.includes(searchTerm);
         const matchesFilter =
-          currentFilter === "all" ||
-          category.includes(currentFilter.toLowerCase());
-        post.style.display = matchesSearch && matchesFilter ? "block" : "none";
+          currentFilter === "all" || category.includes(currentFilter);
+        element.style.display = matchesSearch && matchesFilter ? "block" : "none";
       });
     };
 

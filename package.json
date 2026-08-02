@@ -28,8 +28,7 @@
     "express-rate-limit": "^8.6.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^1.4.5-lts.1",
-    "nodemailer": "^9.0.3",
-    "uuid": "^14.0.1"
+    "nodemailer": "^9.0.3"
   },
   "devDependencies": {
     "clean-css-cli": "^4.0.12",

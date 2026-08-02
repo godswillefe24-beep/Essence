@@ -5,7 +5,6 @@ import { dirname } from "path";
 import fs from "fs";
 import path from "path";
 import crypto from "crypto";
-import { v4 as uuidv4 } from "uuid";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -243,7 +242,7 @@ app.post("/api/comments", async (req, res) => {
     }
 
     const newComment = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       postId: sanitizedPostId,
       userId,
       name: userName,
@@ -308,14 +307,20 @@ app.delete("/api/admin/comments/:id", verifyAdmin, async (req, res) => {
 // ==========================================
 app.get("/api/analytics", async (req, res) => {
   try {
-    const [likesSumRow, commentCountRow, subscribers, viewRows, postsCountRow] =
-      await Promise.all([
-        get("SELECT SUM(likes) as total FROM post_likes"),
-        get("SELECT COUNT(*) as count FROM comments"),
-        readSubscribers(),
-        all("SELECT post_id, views FROM post_views"),
-        get("SELECT COUNT(*) as count FROM posts"),
-      ]);
+    // Consolidate queries: instead of 5 separate queries, use 4 efficient ones
+    const [
+      likesSumRow,
+      commentCountRow,
+      subscriberCountRow,
+      viewRows,
+      postsCountRow,
+    ] = await Promise.all([
+      get("SELECT SUM(likes) as total FROM post_likes"),
+      get("SELECT COUNT(*) as count FROM comments"),
+      get("SELECT COUNT(*) as count FROM subscribers"),
+      all("SELECT post_id, views FROM post_views"),
+      get("SELECT COUNT(*) as count FROM posts"),
+    ]);
 
     const postViews = {};
     viewRows.forEach((r) => {
@@ -326,7 +331,7 @@ app.get("/api/analytics", async (req, res) => {
       postViews,
       totalLikes: likesSumRow?.total || 0,
       totalComments: commentCountRow ? commentCountRow.count : 0,
-      totalSubscribers: subscribers.length,
+      totalSubscribers: subscriberCountRow ? subscriberCountRow.count : 0,
       totalPosts: postsCountRow?.count || 0,
     });
   } catch (error) {
@@ -354,11 +359,11 @@ app.post("/api/analytics/view/:postId", async (req, res) => {
 // API: Like a post
 app.post("/api/analytics/like", async (req, res) => {
   try {
-    await run(
-      "UPDATE site_stats SET total_likes = total_likes + 1 WHERE id = 1",
+    const result = await db.execute(
+      "UPDATE site_stats SET total_likes = total_likes + 1 WHERE id = 1 RETURNING total_likes",
     );
-    const row = await get("SELECT total_likes FROM site_stats WHERE id = 1");
-    res.json({ totalLikes: row.total_likes });
+    const totalLikes = result.rows[0]?.total_likes || 0;
+    res.json({ totalLikes });
   } catch (error) {
     logError("Record like", error);
     res.status(500).json({ error: "Failed to record like" });
@@ -385,15 +390,14 @@ app.get("/api/analytics/likes/:postId", async (req, res) => {
 app.post("/api/analytics/like/:postId", async (req, res) => {
   try {
     const postId = req.params.postId;
-    await run(
-      `INSERT INTO post_likes (post_id, likes) VALUES (?, 1)
-       ON CONFLICT(post_id) DO UPDATE SET likes = likes + 1`,
-      [postId],
-    );
-    const row = await get("SELECT likes FROM post_likes WHERE post_id = ?", [
-      postId,
-    ]);
-    res.json({ postId, likes: row.likes });
+    const result = await db.execute({
+      sql: `INSERT INTO post_likes (post_id, likes) VALUES (?, 1)
+            ON CONFLICT(post_id) DO UPDATE SET likes = likes + 1
+            RETURNING likes`,
+      args: [postId],
+    });
+    const likes = result.rows[0]?.likes || 0;
+    res.json({ postId, likes });
   } catch (error) {
     logError("Like post", error);
     res.status(500).json({ error: "Failed to record like" });
@@ -403,15 +407,14 @@ app.post("/api/analytics/like/:postId", async (req, res) => {
 app.post("/api/analytics/unlike/:postId", async (req, res) => {
   try {
     const postId = req.params.postId;
-    await run(
-      `INSERT INTO post_likes (post_id, likes) VALUES (?, 0)
-       ON CONFLICT(post_id) DO UPDATE SET likes = MAX(likes - 1, 0)`,
-      [postId],
-    );
-    const row = await get("SELECT likes FROM post_likes WHERE post_id = ?", [
-      postId,
-    ]);
-    res.json({ postId, likes: row.likes });
+    const result = await db.execute({
+      sql: `INSERT INTO post_likes (post_id, likes) VALUES (?, 0)
+            ON CONFLICT(post_id) DO UPDATE SET likes = MAX(likes - 1, 0)
+            RETURNING likes`,
+      args: [postId],
+    });
+    const likes = result.rows[0]?.likes || 0;
+    res.json({ postId, likes });
   } catch (error) {
     logError("Unlike post", error);
     res.status(500).json({ error: "Failed to record unlike" });
@@ -442,13 +445,12 @@ app.get("/api/posts/search/:query", async (req, res) => {
     }
 
     query = sanitizeString(query);
-    const posts = await readPosts();
-
-    const results = posts.filter(
-      (post) =>
-        post.title.toLowerCase().includes(query) ||
-        (post.excerpt && post.excerpt.toLowerCase().includes(query)) ||
-        (post.category && post.category.toLowerCase().includes(query)),
+    // Push filtering to SQL instead of loading all posts into memory
+    const results = await all(
+      `SELECT * FROM posts 
+       WHERE LOWER(title) LIKE ? OR LOWER(excerpt) LIKE ? OR LOWER(category) LIKE ?
+       ORDER BY date DESC`,
+      [`%${query}%`, `%${query}%`, `%${query}%`],
     );
 
     logInfo("Search", `Query: "${query}", Results: ${results.length}`);
@@ -462,25 +464,19 @@ app.get("/api/posts/search/:query", async (req, res) => {
 // Public: get popular tags/categories
 app.get("/api/tags/popular", async (req, res) => {
   try {
-    const posts = await readPosts();
-    const tagCounts = {};
+    // Use SQL to aggregate tags, avoiding loading entire post table into memory
+    // Split comma-separated categories by extracting individual tags with GROUP BY
+    const rows = await all(`
+      SELECT TRIM(category) as name, COUNT(*) as count
+      FROM posts
+      WHERE category IS NOT NULL AND category != ''
+      GROUP BY TRIM(category)
+      ORDER BY count DESC
+      LIMIT 10
+    `);
 
-    posts.forEach((post) => {
-      if (post.category) {
-        const tags = post.category.split(",").map((t) => t.trim());
-        tags.forEach((tag) => {
-          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-        });
-      }
-    });
-
-    const popularTags = Object.entries(tagCounts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
-
-    logInfo("Popular Tags", `Found ${popularTags.length} tags`);
-    res.json(popularTags);
+    logInfo("Popular Tags", `Found ${rows.length} tags`);
+    res.json(rows);
   } catch (error) {
     logError("Popular tags", error);
     res.status(500).json({ error: "Failed to fetch popular tags" });
@@ -845,7 +841,7 @@ app.post("/api/auth/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       username,
       email,
       password: hashedPassword,
