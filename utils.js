@@ -47,6 +47,24 @@ export function matchesFilter(postCategory, filterValue) {
   return postCategory.toLowerCase().includes(filterValue.toLowerCase());
 }
 
+export function buildPagination({ total, page, limit }) {
+  const safeLimit = Math.max(1, Number(limit) || 10);
+  const safePage = Math.max(1, Number(page) || 1);
+  const totalPages = Math.max(1, Math.ceil(total / safeLimit));
+  const clampedPage = Math.min(safePage, totalPages);
+  const offset = (clampedPage - 1) * safeLimit;
+
+  return {
+    page: clampedPage,
+    limit: safeLimit,
+    total,
+    totalPages,
+    hasPrev: clampedPage > 1,
+    hasNext: clampedPage < totalPages,
+    offset,
+  };
+}
+
 /**
  * Validates a comment submission using the same rules as POST /api/comments
  * in server.js. Returns sanitized values on success so the caller doesn't
@@ -60,13 +78,18 @@ export function validateComment({ postId, name, text }) {
   if (!sanitizedPostId || !sanitizedText || sanitizedText.length < 2) {
     return {
       valid: false,
-      error: "Missing or invalid required fields (name, text required, min 2 chars)",
+      error:
+        "Missing or invalid required fields (name, text required, min 2 chars)",
     };
   }
 
   return {
     valid: true,
-    sanitized: { postId: sanitizedPostId, name: sanitizedName, text: sanitizedText },
+    sanitized: {
+      postId: sanitizedPostId,
+      name: sanitizedName,
+      text: sanitizedText,
+    },
   };
 }
 

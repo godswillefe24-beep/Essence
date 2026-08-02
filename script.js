@@ -332,46 +332,123 @@
   function initSearchAndFilters() {
     const searchInput = document.querySelector(".search-input");
     const filterButtons = document.querySelectorAll(".filter-btn");
+    const postsGrid = document.getElementById("posts-grid");
+    const paginationContainer = document.getElementById("posts-pagination");
     const tagsContainer =
       document.getElementById("popular-tags") ||
       document.querySelector(".sidebar-widget .tags");
     let currentFilter = "all";
-    let postCache = null;
+    let currentPage = 1;
+    let currentQuery = "";
+    let currentSearchResults = [];
 
-    const buildPostCache = () => {
-      // Cache post data on first load to avoid repeated DOM queries
-      postCache = Array.from(document.querySelectorAll(".post-card")).map(
-        (post) => ({
-          element: post,
-          title: (post.querySelector("h3")?.textContent || "").toLowerCase(),
-          category: (
-            post.querySelector(".post-category")?.textContent || ""
-          ).toLowerCase(),
-          excerpt: (
-            post.querySelector(".post-excerpt")?.textContent || ""
-          ).toLowerCase(),
-        })
-      );
+    const renderPosts = (posts) => {
+      if (!postsGrid) return;
+      if (!posts.length) {
+        postsGrid.innerHTML =
+          '<div class="no-posts">No posts match this search yet.</div>';
+        return;
+      }
+
+      postsGrid.innerHTML = posts
+        .map(
+          (post) => `
+            <article class="post-card" data-post-id="${post.id}">
+              <div class="post-header">
+                <div class="post-category">${post.category || "Uncategorized"}</div>
+              </div>
+              <h3><a href="posts/${post.slug}.html">${post.title}</a></h3>
+              <p class="post-meta">${new Date(post.date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</p>
+              <p class="post-excerpt">${post.excerpt || "Read this post to learn more."}</p>
+              <a href="posts/${post.slug}.html" class="post-link">Read More →</a>
+            </article>
+          `,
+        )
+        .join("");
     };
 
-    const filterAndSearchPosts = () => {
-      if (!postCache) buildPostCache();
-      const searchTerm = searchInput?.value.toLowerCase() || "";
+    const renderPagination = (pagination) => {
+      if (!paginationContainer) return;
+      const pages = [];
+      for (let index = 1; index <= pagination.totalPages; index += 1) {
+        pages.push(
+          `<button class="pagination-btn${pagination.page === index ? " active" : ""}" data-page="${index}">${index}</button>`,
+        );
+      }
 
-      postCache.forEach(({ element, title, category, excerpt }) => {
-        const matchesSearch =
-          title.includes(searchTerm) || excerpt.includes(searchTerm);
-        const matchesFilter =
-          currentFilter === "all" || category.includes(currentFilter);
-        element.style.display = matchesSearch && matchesFilter ? "block" : "none";
-      });
+      paginationContainer.innerHTML = `
+        <div class="pagination-controls">
+          <button class="pagination-btn" data-page="prev" ${pagination.hasPrev ? "" : "disabled"}>← Prev</button>
+          ${pages.join("")}
+          <button class="pagination-btn" data-page="next" ${pagination.hasNext ? "" : "disabled"}>Next →</button>
+        </div>
+      `;
+
+      paginationContainer
+        .querySelectorAll(".pagination-btn")
+        .forEach((button) => {
+          button.addEventListener("click", () => {
+            const requestedPage = button.dataset.page;
+            if (requestedPage === "prev") {
+              if (!pagination.hasPrev) return;
+              currentPage = pagination.page - 1;
+            } else if (requestedPage === "next") {
+              if (!pagination.hasNext) return;
+              currentPage = pagination.page + 1;
+            } else {
+              currentPage = Number(requestedPage);
+            }
+            loadPosts();
+          });
+        });
     };
+
+    async function loadPosts() {
+      const searchTerm = (searchInput?.value || "").trim();
+      const query = searchTerm || currentQuery;
+      const category = currentFilter === "all" ? "" : currentFilter;
+      const url = new URL(`${API_BASE}/posts`, window.location.origin);
+      url.searchParams.set("page", String(currentPage));
+      url.searchParams.set("limit", "6");
+
+      if (query) {
+        url.searchParams.set("q", query);
+      }
+      if (category) {
+        url.searchParams.set("category", category);
+      }
+
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error("Failed to load posts");
+        const result = await response.json();
+        currentSearchResults = result.posts || [];
+        renderPosts(currentSearchResults);
+        renderPagination(
+          result.pagination || {
+            page: 1,
+            totalPages: 1,
+            hasPrev: false,
+            hasNext: false,
+          },
+        );
+      } catch (error) {
+        if (postsGrid) {
+          postsGrid.innerHTML =
+            '<div class="no-posts">Unable to load posts right now.</div>';
+        }
+      }
+    }
 
     let timer;
     if (searchInput) {
       searchInput.addEventListener("input", () => {
         clearTimeout(timer);
-        timer = setTimeout(filterAndSearchPosts, 120);
+        timer = setTimeout(() => {
+          currentPage = 1;
+          currentQuery = searchInput.value.trim();
+          loadPosts();
+        }, 120);
       });
     }
 
@@ -380,11 +457,12 @@
         filterButtons.forEach((b) => b.classList.remove("active"));
         this.classList.add("active");
         currentFilter = this.dataset.filter;
-        filterAndSearchPosts();
+        currentPage = 1;
         showNotification(
           `Filtering by: ${currentFilter === "all" ? "All Posts" : currentFilter}`,
           "info",
         );
+        loadPosts();
       });
     });
 
@@ -411,7 +489,8 @@
                     btn.dataset.filter === currentFilter,
                   ),
                 );
-                filterAndSearchPosts();
+                currentPage = 1;
+                loadPosts();
               });
             });
           }
@@ -426,6 +505,8 @@
     } else {
       setTimeout(loadPopularTags, 500);
     }
+
+    loadPosts();
   }
 
   function initSharing() {
@@ -525,7 +606,10 @@
             return;
           }
           if (text.length > 500) {
-            showNotification("Comment must be less than 500 characters", "error");
+            showNotification(
+              "Comment must be less than 500 characters",
+              "error",
+            );
             return;
           }
           try {
@@ -674,7 +758,10 @@
       headings.forEach((h, i) => {
         const id =
           h.id ||
-          `toc-${i}-${h.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+          `toc-${i}-${h.textContent
+            .trim()
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")}`;
         h.id = id;
         const li = document.createElement("li");
         li.className = `toc-${h.tagName.toLowerCase()}`;
@@ -710,22 +797,87 @@
   }
 
   const POST_MANIFEST = [
-    { title: "Welcome to my blog", url: "posts/post1.html", date: "2025-11-26" },
-    { title: "Latest Technology News and Innovations", url: "posts/post2.html", date: "2026-03-01" },
-    { title: "Getting Started with Your Blog", url: "posts/post3.html", date: "2025-12-10" },
-    { title: "Advanced Customization Techniques", url: "posts/post4.html", date: "2026-01-15" },
-    { title: "How Computers Are Made (And Why It’s Just 0s and 1s)", url: "posts/post5.html", date: "2026-05-05" },
-    { title: "The Biggest Tech Trends Defining 2026", url: "posts/post6.html", date: "2026-05-16" },
-    { title: "Latest Technology Trends Shaping the Future in 2026", url: "posts/post7.html", date: "2026-05-16" },
-    { title: "The Art of Great Writing", url: "posts/post8.html", date: "2026-07-03" },
-    { title: "Understanding Digital Marketing", url: "posts/post9.html", date: "2026-07-03" },
-    { title: "AI Tools and Productivity", url: "posts/post10.html", date: "2026-07-04" },
-    { title: "Gaming and Entertainment", url: "posts/post11.html", date: "2026-07-07" },
-    { title: "Education and Online Learning", url: "posts/post12.html", date: "2026-07-07" },
-    { title: "Make Money Online / Online Business", url: "posts/post13.html", date: "2026-07-07" },
-    { title: "How Creativity Intersects with Personal Growth", url: "posts/post14.html", date: "2026-07-07" },
-    { title: "Finding Your Voice Through Self-Expression", url: "posts/post15.html", date: "2026-07-07" },
-    { title: "Rare and Unusual Programming Languages You Probably Haven't Tried", url: "posts/post16.html", date: "2026-07-07" },
+    {
+      title: "Welcome to my blog",
+      url: "posts/post1.html",
+      date: "2025-11-26",
+    },
+    {
+      title: "Latest Technology News and Innovations",
+      url: "posts/post2.html",
+      date: "2026-03-01",
+    },
+    {
+      title: "Getting Started with Your Blog",
+      url: "posts/post3.html",
+      date: "2025-12-10",
+    },
+    {
+      title: "Advanced Customization Techniques",
+      url: "posts/post4.html",
+      date: "2026-01-15",
+    },
+    {
+      title: "How Computers Are Made (And Why It’s Just 0s and 1s)",
+      url: "posts/post5.html",
+      date: "2026-05-05",
+    },
+    {
+      title: "The Biggest Tech Trends Defining 2026",
+      url: "posts/post6.html",
+      date: "2026-05-16",
+    },
+    {
+      title: "Latest Technology Trends Shaping the Future in 2026",
+      url: "posts/post7.html",
+      date: "2026-05-16",
+    },
+    {
+      title: "The Art of Great Writing",
+      url: "posts/post8.html",
+      date: "2026-07-03",
+    },
+    {
+      title: "Understanding Digital Marketing",
+      url: "posts/post9.html",
+      date: "2026-07-03",
+    },
+    {
+      title: "AI Tools and Productivity",
+      url: "posts/post10.html",
+      date: "2026-07-04",
+    },
+    {
+      title: "Gaming and Entertainment",
+      url: "posts/post11.html",
+      date: "2026-07-07",
+    },
+    {
+      title: "Education and Online Learning",
+      url: "posts/post12.html",
+      date: "2026-07-07",
+    },
+    {
+      title: "Make Money Online / Online Business",
+      url: "posts/post13.html",
+      date: "2026-07-07",
+    },
+    {
+      title: "How Creativity Intersects with Personal Growth",
+      url: "posts/post14.html",
+      date: "2026-07-07",
+    },
+    {
+      title: "Finding Your Voice Through Self-Expression",
+      url: "posts/post15.html",
+      date: "2026-07-07",
+    },
+    {
+      title:
+        "Rare and Unusual Programming Languages You Probably Haven't Tried",
+      url: "posts/post16.html",
+      date: "2026-07-07",
+    },
   ];
 
   function loadRecentPosts() {

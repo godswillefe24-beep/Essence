@@ -9,7 +9,12 @@ import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { all, get, run } from "./db.js";
-import { sanitizeString, sanitizeEmail, escapeXml } from "./utils.js";
+import {
+  sanitizeString,
+  sanitizeEmail,
+  escapeXml,
+  buildPagination,
+} from "./utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -427,7 +432,39 @@ app.post("/api/analytics/unlike/:postId", async (req, res) => {
 
 app.get("/api/posts", async (req, res) => {
   try {
-    res.json(await readPosts());
+    const page = Number(req.query.page || 1);
+    const limit = Number(req.query.limit || 6);
+    const query = sanitizeString(req.query.q || "").toLowerCase();
+    const category = sanitizeString(req.query.category || "").toLowerCase();
+
+    const conditions = [];
+    const params = [];
+
+    if (query) {
+      conditions.push(
+        "(LOWER(title) LIKE ? OR LOWER(excerpt) LIKE ? OR LOWER(category) LIKE ?)",
+      );
+      params.push(`%${query}%`, `%${query}%`, `%${query}%`);
+    }
+
+    if (category) {
+      conditions.push("LOWER(category) = ?");
+      params.push(category);
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const countRow = await get(`SELECT COUNT(*) AS count FROM posts ${whereClause}`, params);
+    const pagination = buildPagination({
+      total: Number(countRow?.count || 0),
+      page,
+      limit,
+    });
+    const posts = await all(
+      `SELECT * FROM posts ${whereClause} ORDER BY date DESC LIMIT ? OFFSET ?`,
+      [...params, pagination.limit, pagination.offset],
+    );
+
+    res.json({ posts, pagination });
   } catch (error) {
     logError("Get posts", error);
     res.status(500).json({ error: "Failed to fetch posts" });
@@ -445,16 +482,33 @@ app.get("/api/posts/search/:query", async (req, res) => {
     }
 
     query = sanitizeString(query);
-    // Push filtering to SQL instead of loading all posts into memory
+    const page = Number(req.query.page || 1);
+    const limit = Number(req.query.limit || 6);
+    const countRow = await get(
+      `SELECT COUNT(*) AS count FROM posts
+       WHERE LOWER(title) LIKE ? OR LOWER(excerpt) LIKE ? OR LOWER(category) LIKE ?`,
+      [`%${query}%`, `%${query}%`, `%${query}%`],
+    );
+    const pagination = buildPagination({
+      total: Number(countRow?.count || 0),
+      page,
+      limit,
+    });
     const results = await all(
       `SELECT * FROM posts 
        WHERE LOWER(title) LIKE ? OR LOWER(excerpt) LIKE ? OR LOWER(category) LIKE ?
-       ORDER BY date DESC`,
-      [`%${query}%`, `%${query}%`, `%${query}%`],
+       ORDER BY date DESC LIMIT ? OFFSET ?`,
+      [
+        `%${query}%`,
+        `%${query}%`,
+        `%${query}%`,
+        pagination.limit,
+        pagination.offset,
+      ],
     );
 
     logInfo("Search", `Query: "${query}", Results: ${results.length}`);
-    res.json(results);
+    res.json({ posts: results, pagination });
   } catch (error) {
     logError("Search posts", error);
     res.status(500).json({ error: "Failed to search posts" });

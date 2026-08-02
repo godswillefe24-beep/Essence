@@ -26,8 +26,9 @@
   async function buildWidget() {
     let posts;
     try {
-      const res = await fetch('/api/posts');
-      posts = await res.json();
+      const res = await fetch('/api/posts?limit=20');
+      const data = await res.json();
+      posts = Array.isArray(data) ? data : data.posts || [];
     } catch {
       return; // fail silently — related posts are a nice-to-have, not critical
     }

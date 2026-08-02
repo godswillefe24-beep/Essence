@@ -6,6 +6,7 @@ import {
   sanitizeEmail,
   escapeXml,
   matchesFilter,
+  buildPagination,
 } from "../utils.js";
 
 test("sanitizeString", async (t) => {
@@ -117,4 +118,30 @@ test("matchesFilter — regression test for the case-sensitivity bug", async (t)
       assert.equal(matchesFilter("Code, Ideas", "code"), true);
     },
   );
+});
+
+test("buildPagination", async (t) => {
+  await t.test("computes correct metadata for the first page", () => {
+    assert.deepEqual(buildPagination({ total: 25, page: 1, limit: 10 }), {
+      page: 1,
+      limit: 10,
+      total: 25,
+      totalPages: 3,
+      hasPrev: false,
+      hasNext: true,
+      offset: 0,
+    });
+  });
+
+  await t.test("clamps page numbers to at least one", () => {
+    assert.deepEqual(buildPagination({ total: 15, page: 0, limit: 5 }), {
+      page: 1,
+      limit: 5,
+      total: 15,
+      totalPages: 3,
+      hasPrev: false,
+      hasNext: true,
+      offset: 0,
+    });
+  });
 });
