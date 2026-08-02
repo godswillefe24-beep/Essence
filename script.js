@@ -369,19 +369,66 @@
 
     const renderPagination = (pagination) => {
       if (!paginationContainer) return;
-      const pages = [];
-      for (let index = 1; index <= pagination.totalPages; index += 1) {
-        pages.push(
-          `<button class="pagination-btn${pagination.page === index ? " active" : ""}" data-page="${index}">${index}</button>`,
-        );
-      }
+
+      const getPageWindow = (currentPage, totalPages) => {
+        const pages = [];
+        const addPage = (value) => {
+          if (!pages.includes(value)) {
+            pages.push(value);
+          }
+        };
+
+        addPage(1);
+        if (currentPage > 3) {
+          addPage("ellipsis-left");
+        }
+
+        const start = Math.max(2, currentPage - 1);
+        const end = Math.min(totalPages - 1, currentPage + 1);
+        for (let index = start; index <= end; index += 1) {
+          addPage(index);
+        }
+
+        if (currentPage < totalPages - 2) {
+          addPage("ellipsis-right");
+        }
+
+        if (totalPages > 1) {
+          addPage(totalPages);
+        }
+
+        return pages;
+      };
+
+      const pageWindow = getPageWindow(pagination.page, pagination.totalPages);
+      const pageButtons = pageWindow
+        .map((page) => {
+          if (page === "ellipsis-left" || page === "ellipsis-right") {
+            return '<span class="pagination-ellipsis">…</span>';
+          }
+
+          return `
+            <button
+              class="pagination-btn${pagination.page === page ? " active" : ""}"
+              data-page="${page}"
+            >
+              ${page}
+            </button>
+          `;
+        })
+        .join("");
 
       paginationContainer.innerHTML = `
         <div class="pagination-controls">
-          <button class="pagination-btn" data-page="prev" ${pagination.hasPrev ? "" : "disabled"}>← Prev</button>
-          ${pages.join("")}
-          <button class="pagination-btn" data-page="next" ${pagination.hasNext ? "" : "disabled"}>Next →</button>
+          <button class="pagination-btn pagination-btn-nav" data-page="prev" ${pagination.hasPrev ? "" : "disabled"}>
+            ← Older
+          </button>
+          <div class="pagination-pages">${pageButtons}</div>
+          <button class="pagination-btn pagination-btn-nav" data-page="next" ${pagination.hasNext ? "" : "disabled"}>
+            Newer →
+          </button>
         </div>
+        <p class="pagination-summary">Page ${pagination.page} of ${pagination.totalPages}</p>
       `;
 
       paginationContainer
