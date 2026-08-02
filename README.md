@@ -101,7 +101,7 @@ Essence/
 ├── embed-posts.js          # Compute post embeddings
 ├── embeddings.js           # Hugging Face helper
 ├── routes/chat.js          # AI chat endpoint
-├── posts/post1.html … post16.html
+├── posts/post1.html … post17.html
 ├── public/js/              # chat-widget.js, post-actions.js
 ├── public/css/
 ├── render.yaml             # Render deployment config

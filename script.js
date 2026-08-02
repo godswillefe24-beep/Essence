@@ -925,6 +925,11 @@
       url: "posts/post16.html",
       date: "2026-07-07",
     },
+    {
+      title: "How to Build a Writing Habit That Actually Lasts",
+      url: "posts/post17.html",
+      date: "2026-08-02",
+    },
   ];
 
   function loadRecentPosts() {
