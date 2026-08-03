@@ -80,14 +80,25 @@
 
       if (this.user) {
         authBtn.textContent = `👤 ${this.user.username}`;
+        authBtn.setAttribute(
+          "aria-label",
+          `Open profile menu for ${this.user.username}`,
+        );
+        authBtn.setAttribute(
+          "aria-expanded",
+          userDropdown.classList.contains("hidden") ? "false" : "true",
+        );
         authBtn.classList.add("logged-in");
         authBtn.onclick = (e) => {
           e.stopPropagation();
-          userDropdown.classList.toggle("hidden");
+          const isHidden = userDropdown.classList.toggle("hidden");
+          authBtn.setAttribute("aria-expanded", isHidden ? "false" : "true");
         };
         this.updateUserProfile();
       } else {
         authBtn.textContent = "👤 Login";
+        authBtn.setAttribute("aria-label", "Open login menu");
+        authBtn.setAttribute("aria-expanded", "false");
         authBtn.classList.remove("logged-in");
         authBtn.onclick = () => {
           const modal = document.getElementById("auth-modal");
@@ -278,6 +289,45 @@
     setTimeout(() => notification.remove(), 2600);
   }
 
+  function formatReadingTime(text = "", fallbackMinutes = 3) {
+    const words = String(text || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean).length;
+    const minutes = Math.max(1, Math.ceil(words / 200));
+    return `${minutes} min read`;
+  }
+
+  function formatRelativeTime(value) {
+    const timestamp = new Date(value);
+    if (Number.isNaN(timestamp.getTime())) return "just now";
+
+    const seconds = Math.max(
+      1,
+      Math.floor((Date.now() - timestamp.getTime()) / 1000),
+    );
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    const weeks = Math.floor(days / 7);
+
+    if (weeks > 0) return `${weeks} week${weeks > 1 ? "s" : ""} ago`;
+    if (days > 0) return `${days} day${days > 1 ? "s" : ""} ago`;
+    if (hours > 0) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
+    if (minutes > 0) return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
+    return "just now";
+  }
+
+  function initReadingMeta() {
+    const featuredExcerpt = document.querySelector(
+      ".featured-post .featured-excerpt",
+    );
+    const featuredMeta = document.querySelector(".featured-post .meta-reading");
+    if (featuredMeta) {
+      featuredMeta.textContent = `⏱️ ${formatReadingTime(featuredExcerpt?.textContent || "")}`;
+    }
+  }
+
   function initTheme() {
     const themeToggle = document.querySelector(".theme-toggle, .theme-btn");
     if (!themeToggle) return;
@@ -286,11 +336,21 @@
       document.body.classList.add("dark-mode");
       themeToggle.textContent = "☀️";
     }
+    themeToggle.setAttribute(
+      "aria-label",
+      isDarkMode ? "Switch to light mode" : "Switch to dark mode",
+    );
+    themeToggle.setAttribute("aria-pressed", String(isDarkMode));
     themeToggle.addEventListener("click", () => {
       document.body.classList.toggle("dark-mode");
       const isDark = document.body.classList.contains("dark-mode");
       db.setDarkMode(isDark);
       themeToggle.textContent = isDark ? "☀️" : "🌙";
+      themeToggle.setAttribute(
+        "aria-label",
+        isDark ? "Switch to light mode" : "Switch to dark mode",
+      );
+      themeToggle.setAttribute("aria-pressed", String(isDark));
       showNotification(
         isDark ? "Dark mode enabled 🌙" : "Light mode enabled ☀️",
         "success",
@@ -341,6 +401,20 @@
     let currentPage = 1;
     let currentQuery = "";
     let currentSearchResults = [];
+
+    const updateFilterButtons = () => {
+      filterButtons.forEach((btn) => {
+        const isActive = btn.dataset.filter === currentFilter;
+        btn.classList.toggle("active", isActive);
+        btn.setAttribute("aria-pressed", String(isActive));
+      });
+    };
+
+    updateFilterButtons();
+
+    if (searchInput) {
+      searchInput.setAttribute("aria-label", "Search posts");
+    }
 
     const renderPosts = (posts) => {
       if (!postsGrid) return;
@@ -499,12 +573,30 @@
       });
     }
 
+    document.addEventListener("keydown", (event) => {
+      const activeTag = (event.target?.tagName || "").toLowerCase();
+      const isTyping =
+        ["input", "textarea", "select"].includes(activeTag) ||
+        event.target?.isContentEditable;
+      if (isTyping) return;
+      if (
+        (event.key === "/" &&
+          !event.metaKey &&
+          !event.ctrlKey &&
+          !event.altKey) ||
+        ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k")
+      ) {
+        event.preventDefault();
+        searchInput?.focus();
+        searchInput?.select();
+      }
+    });
+
     filterButtons.forEach((btn) => {
       btn.addEventListener("click", function () {
-        filterButtons.forEach((b) => b.classList.remove("active"));
-        this.classList.add("active");
         currentFilter = this.dataset.filter;
         currentPage = 1;
+        updateFilterButtons();
         showNotification(
           `Filtering by: ${currentFilter === "all" ? "All Posts" : currentFilter}`,
           "info",
@@ -595,10 +687,69 @@
       const commentsCount = section.querySelector(".comments-count");
       if (!postId || !commentsList || !commentsCount) return;
 
+      let localComments = [];
+
       const escapeHtml = (text) => {
         const div = document.createElement("div");
         div.textContent = text;
         return div.innerHTML;
+      };
+
+      const renderComments = (comments) => {
+        commentsCount.textContent = comments.length;
+        commentsList.innerHTML =
+          comments.length > 0
+            ? comments
+                .map(
+                  (comment) => `
+              <div class="comment-item${comment.parentId ? " comment-reply" : ""}" data-comment-id="${comment.id}">
+                <div class="comment-header">
+                  <div>
+                    <span class="comment-author">👤 ${escapeHtml(comment.name)}</span>
+                    <span class="comment-time">${formatRelativeTime(comment.timestamp)}</span>
+                  </div>
+                </div>
+                <p class="comment-text">${escapeHtml(comment.text)}</p>
+                <button class="comment-reply-btn" type="button" data-comment-id="${comment.id}">Reply</button>
+                <form class="comment-reply-form hidden">
+                  <textarea rows="2" placeholder="Write a reply..."></textarea>
+                  <button type="submit">Post reply</button>
+                </form>
+              </div>`,
+                )
+                .join("")
+            : '<div class="no-comments">Be the first to comment! 💭</div>';
+
+        commentsList
+          .querySelectorAll(".comment-reply-btn")
+          .forEach((button) => {
+            button.addEventListener("click", () => {
+              const form = button.parentElement.querySelector(
+                ".comment-reply-form",
+              );
+              form?.classList.toggle("hidden");
+              form?.querySelector("textarea")?.focus();
+            });
+          });
+
+        commentsList.querySelectorAll(".comment-reply-form").forEach((form) => {
+          form.addEventListener("submit", (event) => {
+            event.preventDefault();
+            const textarea = form.querySelector("textarea");
+            const replyText = textarea?.value.trim();
+            if (!replyText) return;
+            const parentId = form.closest(".comment-item")?.dataset.commentId;
+            const newReply = {
+              id: `reply-${Date.now()}`,
+              parentId,
+              name: authManager.user?.username || "You",
+              text: replyText,
+              timestamp: new Date().toISOString(),
+            };
+            localComments = [...localComments, newReply];
+            renderComments([...localComments]);
+          });
+        });
       };
 
       const loadComments = async () => {
@@ -606,29 +757,14 @@
           const response = await fetch(`${API_BASE}/comments/${postId}`);
           if (response.ok) {
             const comments = await response.json();
-            commentsCount.textContent = comments.length;
-            commentsList.innerHTML =
-              comments.length > 0
-                ? comments
-                    .map(
-                      (comment) => `
-                <div class="comment-item" data-comment-id="${comment.id}">
-                  <div class="comment-header">
-                    <div>
-                      <span class="comment-author">👤 ${escapeHtml(comment.name)}</span>
-                      <span class="comment-time">${new Date(comment.timestamp).toLocaleString()}</span>
-                    </div>
-                  </div>
-                  <p class="comment-text">${escapeHtml(comment.text)}</p>
-                </div>`,
-                    )
-                    .join("")
-                : '<div class="no-comments">Be the first to comment! 💭</div>';
+            localComments = comments;
+            renderComments(localComments);
+            return;
           }
         } catch (error) {
-          commentsList.innerHTML =
-            '<div class="no-comments">Comments are temporarily unavailable.</div>';
+          // Ignore and fall back to the empty state.
         }
+        renderComments(localComments);
       };
 
       if (authManager.user && nameInput) nameInput.style.display = "none";
@@ -996,6 +1132,7 @@
   function init() {
     authManager.init();
     initTheme();
+    initReadingMeta();
     initProgressBar();
     initSearchAndFilters();
     initSharing();
