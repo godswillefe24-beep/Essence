@@ -28,13 +28,19 @@ function extractContent(html) {
   const sectionMatch = html.match(
     /<section[^>]*class=["'][^"']*\bcontent\b[^"']*["'][^>]*>([\s\S]*?)<\/section>/i,
   );
-  if (sectionMatch) return { html: sectionMatch[1].trim(), strategy: "section.content" };
+  if (sectionMatch)
+    return { html: sectionMatch[1].trim(), strategy: "section.content" };
 
   const articleMatch = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
-  if (articleMatch) return { html: articleMatch[1].trim(), strategy: "article" };
+  if (articleMatch)
+    return { html: articleMatch[1].trim(), strategy: "article" };
 
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  if (bodyMatch) return { html: bodyMatch[1].trim(), strategy: "body (unreliable — check manually)" };
+  if (bodyMatch)
+    return {
+      html: bodyMatch[1].trim(),
+      strategy: "body (unreliable — check manually)",
+    };
 
   return null;
 }
@@ -67,7 +73,9 @@ async function main() {
     const extracted = extractContent(html);
 
     if (!extracted) {
-      console.warn(`  (!) Could not find any content region in ${post.slug}.html — skipped`);
+      console.warn(
+        `  (!) Could not find any content region in ${post.slug}.html — skipped`,
+      );
       continue;
     }
 
@@ -76,7 +84,9 @@ async function main() {
       post.id,
     ]);
 
-    const flag = extracted.strategy.startsWith("body") ? "  ⚠ REVIEW MANUALLY" : "";
+    const flag = extracted.strategy.startsWith("body")
+      ? "  ⚠ REVIEW MANUALLY"
+      : "";
     console.log(`  OK: ${post.slug} (via ${extracted.strategy})${flag}`);
     migrated++;
   }
