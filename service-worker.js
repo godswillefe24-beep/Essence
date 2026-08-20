@@ -1,4 +1,4 @@
-const CACHE_NAME = 'essence-v2';
+const CACHE_NAME = 'essence-v3';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -20,7 +20,8 @@ const urlsToCache = [
   '/posts/post13.html',
   '/posts/post14.html',
   '/posts/post15.html',
-  '/posts/post16.html'
+  '/posts/post16.html',
+  '/posts/post17.html'
 ];
 
 // Install event - cache files

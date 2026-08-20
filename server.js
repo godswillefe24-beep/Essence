@@ -8,12 +8,13 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { all, get, run } from "./db.js";
+import { all, get, run, db } from "./db.js";
 import {
   sanitizeString,
   sanitizeEmail,
   escapeXml,
   buildPagination,
+  slugify,
 } from "./utils.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -81,40 +82,57 @@ function sanitizePostContent(content) {
   return stripDangerousHtml(sanitizeString(content));
 }
 
-// Rate limiting (simple in-memory — unrelated to persistent storage, left as-is)
-const rateLimitStore = new Map();
-function checkRateLimit(key, maxRequests = 10, windowMs = 60000) {
-  const now = Date.now();
-  const record = rateLimitStore.get(key) || {
-    count: 0,
-    resetTime: now + windowMs,
-  };
+// Rate limiting — was a hand-rolled in-memory Map that never evicted old
+// keys (unbounded growth for the life of the process). express-rate-limit
+// was already an installed dependency (package.json) but never actually
+// imported anywhere in this file — the hand-rolled version was still what
+// ran. Replacing it here completes that migration.
+import { rateLimit } from "express-rate-limit";
 
-  if (now > record.resetTime) {
-    rateLimitStore.set(key, { count: 1, resetTime: now + windowMs });
-    return true;
-  }
+// Render sits behind a reverse proxy; without this, req.ip resolves to the
+// proxy's address (same value for every visitor), which would make every
+// rate limit effectively global instead of per-client.
+app.set("trust proxy", 1);
 
-  if (record.count >= maxRequests) {
-    return false;
-  }
+// Preserves the original per-route-per-IP budget: each method+path
+// combination gets its own 100/min allowance, not one shared budget
+// across the whole API (express-rate-limit's default key is IP-only).
+const globalLimiter = rateLimit({
+  windowMs: 60000,
+  limit: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.method}-${req.path}-${req.ip}`,
+  message: { error: "Too many requests, please try again later" },
+});
 
-  record.count++;
-  rateLimitStore.set(key, record);
-  return true;
-}
+const commentLimiter = rateLimit({
+  windowMs: 60000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many comments, please wait before posting again" },
+});
 
-function rateLimitMiddleware(req, res, next) {
-  const key = `${req.method}-${req.path}-${req.ip}`;
-  if (!checkRateLimit(key, 100, 60000)) {
-    return res
-      .status(429)
-      .json({ error: "Too many requests, please try again later" });
-  }
-  next();
-}
+const subscribeLimiter = rateLimit({
+  windowMs: 3600000,
+  limit: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: "Too many subscription attempts, please try again later",
+  },
+});
 
-app.use(rateLimitMiddleware);
+const adminLoginLimiter = rateLimit({
+  windowMs: 60000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many login attempts, please wait before trying again" },
+});
+
+app.use(globalLimiter);
 
 // ==========================================
 // JWT SECRET — must be set explicitly now.
@@ -146,8 +164,39 @@ const transporter = nodemailer.createTransport({
 // DATA ACCESS HELPERS (replace old fs-based readX/writeX functions)
 // ==========================================
 
+// Preview/list column set — deliberately excludes `content` (full article
+// HTML, can be large) and `embedding` (a serialized vector, also large).
+// Both now exist on the posts table but neither belongs in a list response;
+// use getPostFull() below when the full article is actually needed.
+const POST_PREVIEW_COLUMNS =
+  "id, slug, title, category, date, excerpt, updated_at";
+
 async function readPosts() {
-  return all("SELECT * FROM posts ORDER BY date DESC");
+  return all(`SELECT ${POST_PREVIEW_COLUMNS} FROM posts ORDER BY date DESC`);
+}
+
+// Full single-post fetch, including content — used by the new
+// GET /api/posts/:id route below for dynamic (DB-driven) rendering.
+async function getPostFull(idOrSlug) {
+  return get("SELECT * FROM posts WHERE id = ? OR slug = ?", [
+    idOrSlug,
+    idOrSlug,
+  ]);
+}
+
+// Turns a title into a unique slug, appending -2, -3, ... on collision.
+// Falls back to "post" as the base if the title slugifies to nothing at
+// all (e.g. a title made entirely of emoji/symbols) so post creation
+// can't fail outright over an edge-case title.
+async function generateUniqueSlug(title) {
+  const base = slugify(title) || "post";
+  let candidate = base;
+  let suffix = 2;
+  while (await get("SELECT id FROM posts WHERE slug = ?", [candidate])) {
+    candidate = `${base}-${suffix}`;
+    suffix++;
+  }
+  return candidate;
 }
 
 function mapComment(row) {
@@ -208,7 +257,7 @@ app.get("/api/comments/:postId", async (req, res) => {
 });
 
 // API: Post a new comment
-app.post("/api/comments", async (req, res) => {
+app.post("/api/comments", commentLimiter, async (req, res) => {
   try {
     const { postId, name, text } = req.body;
 
@@ -221,13 +270,6 @@ app.post("/api/comments", async (req, res) => {
         error:
           "Missing or invalid required fields (name, text required, min 2 chars)",
       });
-    }
-
-    const rateLimitKey = `comment-${req.ip}`;
-    if (!checkRateLimit(rateLimitKey, 5, 60000)) {
-      return res
-        .status(429)
-        .json({ error: "Too many comments, please wait before posting again" });
     }
 
     const authHeader = req.headers.authorization;
@@ -460,7 +502,7 @@ app.get("/api/posts", async (req, res) => {
       limit,
     });
     const posts = await all(
-      `SELECT * FROM posts ${whereClause} ORDER BY date DESC LIMIT ? OFFSET ?`,
+      `SELECT ${POST_PREVIEW_COLUMNS} FROM posts ${whereClause} ORDER BY date DESC LIMIT ? OFFSET ?`,
       [...params, pagination.limit, pagination.offset],
     );
 
@@ -468,6 +510,23 @@ app.get("/api/posts", async (req, res) => {
   } catch (error) {
     logError("Get posts", error);
     res.status(500).json({ error: "Failed to fetch posts" });
+  }
+});
+
+// Public: get a single post's full content (id or slug) — the DB-backed
+// replacement for reading posts/<slug>.html directly. Powers dynamic
+// post rendering: fetch this, then render `content` into a template
+// client-side or via SSR, instead of relying on the static file.
+app.get("/api/posts/:idOrSlug", async (req, res) => {
+  try {
+    const post = await getPostFull(req.params.idOrSlug);
+    if (!post) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+    res.json(post);
+  } catch (error) {
+    logError("Get single post", error);
+    res.status(500).json({ error: "Failed to fetch post" });
   }
 });
 
@@ -495,7 +554,7 @@ app.get("/api/posts/search/:query", async (req, res) => {
       limit,
     });
     const results = await all(
-      `SELECT * FROM posts 
+      `SELECT ${POST_PREVIEW_COLUMNS} FROM posts 
        WHERE LOWER(title) LIKE ? OR LOWER(excerpt) LIKE ? OR LOWER(category) LIKE ?
        ORDER BY date DESC LIMIT ? OFFSET ?`,
       [
@@ -548,8 +607,8 @@ app.get("/api/tags/popular", async (req, res) => {
 // endpoint for genuinely new posts with new ids, not to edit post1-16.
 app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
   try {
-    const { id, title, category, content, date } = req.body;
-    if (!id || !title || !content) {
+    const { title, category, content, date } = req.body;
+    if (!title || !content) {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
@@ -561,18 +620,33 @@ app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
       return res.status(400).json({ error: "Invalid title or content" });
     }
 
+    // Server-generated slug from the title, replacing the old client-side
+    // `"post-" + Date.now()` scheme. id and slug are kept equal here (same
+    // convention the old scheme used) — only the legacy seeded posts
+    // (1-16) have id decoupled from slug; every extraction of a post
+    // identifier from a URL elsewhere in this codebase (script.js,
+    // post-actions.js) already accounts for that split, so this doesn't
+    // require touching any of that logic.
+    const generatedSlug = await generateUniqueSlug(sanitizedTitle);
+
     const postMeta = {
-      id,
+      id: generatedSlug,
       title: sanitizedTitle,
       category: sanitizedCategory,
       date: date || new Date().toISOString(),
-      slug: id,
+      slug: generatedSlug,
       excerpt: sanitizedContent.slice(0, 160),
     };
 
+    // `content` is now persisted to Turso — this is the fix for the gap
+    // where full post content only ever lived in posts/<slug>.html, which
+    // is lost on every redeploy on Render's free tier (ephemeral disk).
+    // The static file below is still written too, so RSS/sitemap
+    // generation (which read posts/*.html directly) keep working
+    // unchanged — Turso is now the source of truth either way.
     await run(
-      `INSERT OR REPLACE INTO posts (id, slug, title, category, date, excerpt, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR REPLACE INTO posts (id, slug, title, category, date, excerpt, content, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         postMeta.id,
         postMeta.slug,
@@ -580,6 +654,7 @@ app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
         postMeta.category,
         postMeta.date,
         postMeta.excerpt,
+        sanitizedContent,
         new Date().toISOString(),
       ],
     );
@@ -677,11 +752,12 @@ app.put("/api/admin/posts/:id", verifyAdmin, async (req, res) => {
 
     const excerpt = sanitizedContent.slice(0, 160);
     await run(
-      `UPDATE posts SET title = ?, category = ?, excerpt = ?, updated_at = ? WHERE id = ?`,
+      `UPDATE posts SET title = ?, category = ?, excerpt = ?, content = ?, updated_at = ? WHERE id = ?`,
       [
         sanitizedTitle,
         sanitizedCategory,
         excerpt,
+        sanitizedContent,
         new Date().toISOString(),
         post.id,
       ],
@@ -749,20 +825,13 @@ app.get("/api/posts/related/:category", async (req, res) => {
 // ==========================================
 // API: Subscribe to newsletter
 // ==========================================
-app.post("/api/subscribe", async (req, res) => {
+app.post("/api/subscribe", subscribeLimiter, async (req, res) => {
   try {
     const { email } = req.body;
 
     const sanitizedEmail = sanitizeEmail(email);
     if (!sanitizedEmail) {
       return res.status(400).json({ error: "Invalid email address" });
-    }
-
-    const rateLimitKey = `subscribe-${req.ip}`;
-    if (!checkRateLimit(rateLimitKey, 3, 3600000)) {
-      return res.status(429).json({
-        error: "Too many subscription attempts, please try again later",
-      });
     }
 
     const existing = await get("SELECT id FROM subscribers WHERE email = ?", [
@@ -1095,15 +1164,8 @@ app.put("/api/users/profile/:id", async (req, res) => {
 // ADMIN AUTHENTICATION
 // ==========================================
 
-app.post("/api/admin/login", async (req, res) => {
+app.post("/api/admin/login", adminLoginLimiter, async (req, res) => {
   const { password } = req.body;
-
-  const rateLimitKey = `admin-login-${req.ip}`;
-  if (!checkRateLimit(rateLimitKey, 5, 60000)) {
-    return res.status(429).json({
-      error: "Too many login attempts, please wait before trying again",
-    });
-  }
 
   try {
     if (typeof password !== "string" || !password) {

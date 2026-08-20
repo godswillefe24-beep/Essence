@@ -4,6 +4,28 @@
 // app.listen() at import time, which makes it awkward to import just a
 // couple of functions from it for testing.
 
+/**
+ * Converts a post title into a URL-safe slug: lowercase, alphanumeric
+ * words joined by single hyphens, no leading/trailing hyphens, capped at
+ * a reasonable length so URLs stay manageable.
+ *
+ * Pure and collision-agnostic on purpose — deciding what to do when a
+ * slug already exists (append -2, -3, ...) requires a DB lookup, so that
+ * lives in server.js's generateUniqueSlug(), which calls this first.
+ */
+export function slugify(title) {
+  if (typeof title !== "string") return "";
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 80)
+    .replace(/-$/, ""); // slice() can leave a trailing hyphen if it cuts mid-word
+}
+
 export function sanitizeString(str) {
   if (typeof str !== "string") return "";
   return str.trim().substring(0, 5000);

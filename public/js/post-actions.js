@@ -10,9 +10,19 @@
 //   <script src="../public/js/post-actions.js"></script>
 
 (function () {
-  const match = window.location.pathname.match(/post(\d+)\.html/);
-  if (!match) return; // not a post page, nothing to do
-  const postId = match[1];
+  // Legacy posts (post1..post16): posts.id is a bare number, decoupled
+  // from the slug ("post5.html" -> id "5"). Admin-created posts: id and
+  // slug are the SAME string (server.js sets postMeta.slug = id on
+  // creation), so for those the full slug IS the real id. Try the legacy
+  // numeric pattern first; fall back to the full slug otherwise — that
+  // fallback is exactly what previously made this whole widget silently
+  // not render at all on any admin-created post (the old regex required
+  // digits immediately after "post", which a hyphenated id never has).
+  const slugMatch = window.location.pathname.match(/\/posts\/([^/]+)\.html/);
+  if (!slugMatch) return; // not a post page, nothing to do
+  const slug = slugMatch[1];
+  const legacyMatch = slug.match(/^post(\d+)$/);
+  const postId = legacyMatch ? legacyMatch[1] : slug;
 
   const LIKED_KEY = `essence-liked-${postId}`;
 

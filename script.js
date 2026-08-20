@@ -916,12 +916,28 @@
     }
   }
 
+  // Legacy posts (post1..post16): posts.id is a bare number, decoupled
+  // from the slug ("post5.html" -> id "5"). Admin-created posts: id and
+  // slug are the SAME string (both "post-<timestamp>"), because
+  // server.js sets `postMeta.slug = id` on creation — so for those, the
+  // full slug IS the real id. One regex can't produce the right value
+  // for both cases, so: try the legacy numeric pattern first, and only
+  // fall back to the full slug when that doesn't match (which is exactly
+  // when the URL is a "post-<timestamp>.html" admin-created post).
+  function extractPostIdFromUrl(pathname) {
+    const slugMatch = pathname.match(/\/posts\/([^/]+)\.html/);
+    if (!slugMatch) return null;
+    const slug = slugMatch[1];
+    const legacyMatch = slug.match(/^post(\d+)$/);
+    return legacyMatch ? legacyMatch[1] : slug;
+  }
+
   function initPageViewTracking() {
-    const match = window.location.pathname.match(/post(\d+)\.html/);
-    if (!match) return;
-    fetch(`${API_BASE}/analytics/view/${match[1]}`, { method: "POST" }).catch(
-      () => {},
-    );
+    const postId = extractPostIdFromUrl(window.location.pathname);
+    if (!postId) return;
+    fetch(`${API_BASE}/analytics/view/${encodeURIComponent(postId)}`, {
+      method: "POST",
+    }).catch(() => {});
   }
 
   function generateTOCAndAuthor() {
@@ -1099,8 +1115,7 @@
       const postViews = data.postViews || {};
 
       const ranked = POST_MANIFEST.map((post) => {
-        const idMatch = post.url.match(/post(\d+)\.html/);
-        const postId = idMatch ? idMatch[1] : null;
+        const postId = extractPostIdFromUrl(`/${post.url}`);
         const views = postId ? postViews[postId] || 0 : 0;
         return { ...post, views };
       })

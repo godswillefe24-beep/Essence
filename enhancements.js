@@ -104,7 +104,16 @@ async function enhancePostMetadata() {
 
     const readingTimeHTML = `<span class="meta-item reading-time">📖 ${readingTime} min read</span>`;
 
-    if (!metaContainer.innerHTML.includes("reading-time")) {
+    // Guards against BOTH this function's own class ('reading-time', for
+    // when it runs twice) AND index.html's separately hardcoded markup
+    // ('meta-reading') — without the second check, the homepage's
+    // featured post (which already shows a hand-written "⏱️ X min read")
+    // would get a second, dynamically-calculated estimate appended next
+    // to it, which can visibly disagree with the hardcoded value.
+    if (
+      !metaContainer.innerHTML.includes("reading-time") &&
+      !metaContainer.innerHTML.includes("meta-reading")
+    ) {
       metaContainer.innerHTML += readingTimeHTML;
     }
   });
@@ -116,8 +125,9 @@ async function enhancePostMetadata() {
 
 async function loadRelatedPosts(currentPostCategory, limit = 3) {
   try {
-    const response = await fetch("/api/posts");
-    const posts = await response.json();
+    const response = await fetch("/api/posts?limit=1000");
+    const data = await response.json();
+    const posts = Array.isArray(data) ? data : data.posts || [];
 
     // Filter related posts by same category
     const relatedPosts = posts
@@ -228,8 +238,9 @@ let allPosts = [];
 
 async function initAdvancedSearch() {
   try {
-    const response = await fetch("/api/posts");
-    allPosts = await response.json();
+    const response = await fetch("/api/posts?limit=1000");
+    const data = await response.json();
+    allPosts = Array.isArray(data) ? data : data.posts || [];
   } catch (error) {
     console.error("Error loading posts for search:", error);
   }
@@ -458,7 +469,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Enhance existing features
   enhancePostMetadata();
-  initializeSocialSharing();
+  // initializeSocialSharing() removed — duplicates the .share-btn buttons
+  // already hand-built into index.html's featured post (and every post
+  // page), which script.js already wires up via a single delegated click
+  // handler (see script.js, initShareButtons-style handler on
+  // ".share-btn"). Running both meant a second, separately-styled share
+  // widget got inserted into the DOM on top of the existing one — same
+  // class of duplicate-widget bug already fixed for the table-of-contents
+  // below.
   // generateTableOfContents() removed — script.js now has its own TOC
   // generator (generateTOCAndAuthor, produces "On this page") that's
   // better-engineered: correctly scoped to the article from the start,

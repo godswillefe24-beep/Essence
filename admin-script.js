@@ -120,6 +120,9 @@ async function handlePostSubmit(e) {
     return;
   }
 
+  const submitBtn = document.getElementById("submit-btn");
+  submitBtn.disabled = true;
+
   try {
     const method = editPostId ? "PUT" : "POST";
     const endpoint = editPostId
@@ -133,7 +136,10 @@ async function handlePostSubmit(e) {
         Authorization: `Bearer ${adminToken}`,
       },
       body: JSON.stringify({
-        id: editPostId || "post-" + Date.now(),
+        // id is only meaningful on edit (identifies which post to update).
+        // On create, the server now generates the id/slug from the title
+        // itself — sending a client-made id here would just be ignored.
+        ...(editPostId && { id: editPostId }),
         title,
         content,
         category,
@@ -158,6 +164,8 @@ async function handlePostSubmit(e) {
   } catch (error) {
     console.error("Post save error:", error);
     alert("Error saving post: " + error.message);
+  } finally {
+    submitBtn.disabled = false;
   }
 }
 
@@ -226,21 +234,6 @@ async function loadDashboardData() {
       document.getElementById("stat-subscribers").textContent =
         data.totalSubscribers || 0;
     }
-
-    // Top posts by views / likes (admin-only endpoint, has richer data)
-    try {
-      const statsRes = await fetch(`${API}/admin/stats`, {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      if (statsRes.ok) {
-        const stats = await statsRes.json();
-        renderTopPostsList("top-views-list", stats.topPostsByViews, "views");
-        renderTopPostsList("top-likes-list", stats.topPostsByLikes, "likes");
-      }
-    } catch (statsErr) {
-      console.log("Could not load top posts stats:", statsErr.message);
-    }
-
     // Load current settings to prefill form
     try {
       const sres = await fetch(`${API}/admin/settings`, {
@@ -267,37 +260,12 @@ async function loadDashboardData() {
   }
 }
 
-function renderTopPostsList(containerId, items, metricLabel) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-
-  if (!items || items.length === 0) {
-    container.innerHTML =
-      '<p style="opacity: 0.7; padding: 12px 0;">No data yet.</p>';
-    return;
-  }
-
-  container.innerHTML = items
-    .map(
-      (item) => `
-    <div class="item">
-      <div class="item-info">
-        <h3>${item.title}</h3>
-      </div>
-      <div class="item-actions">
-        <strong>${item[metricLabel]}</strong>&nbsp;${metricLabel}
-      </div>
-    </div>
-  `,
-    )
-    .join("");
-}
-
 async function loadPosts() {
   try {
-    const response = await fetch(`${API}/posts`);
+    const response = await fetch(`${API}/posts?limit=1000`);
     if (response.ok) {
-      const posts = await response.json();
+      const data = await response.json();
+      const posts = Array.isArray(data) ? data : data.posts || [];
       const container = document.getElementById("posts-list");
       container.innerHTML = (posts || [])
         .map(
@@ -324,9 +292,10 @@ async function loadPosts() {
 
 async function editPost(postId) {
   try {
-    const response = await fetch(`${API}/posts`);
+    const response = await fetch(`${API}/posts?limit=1000`);
     if (response.ok) {
-      const posts = await response.json();
+      const data = await response.json();
+      const posts = Array.isArray(data) ? data : data.posts || [];
       const post = posts.find((p) => p.id === postId);
       if (post) {
         const postModal = document.getElementById("post-modal");

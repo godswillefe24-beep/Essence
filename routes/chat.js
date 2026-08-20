@@ -34,7 +34,19 @@ const router = express.Router();
 // ---- Config -----------------------------------------------------------
 
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+// llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16 (see
+// their "REMINDER: Llama 3.3 70B Versatile is being decommissioned" email)
+// — requests to it now fail, which is why the chat widget started showing
+// "The AI chat is temporarily unavailable". Groq's own notice named two
+// replacements: "GPT OSS 120B" and "Qwen3.6 27B" (marketing names, not API
+// identifiers — their email didn't include the literal model strings).
+// Defaulting to openai/gpt-oss-120b, which matches Groq's known model-ID
+// convention from before this model's release. Overridable via env var so
+// a wrong guess (or Groq changing things again) doesn't need a redeploy —
+// just set GROQ_MODEL in Render's environment tab.
+// Verify the exact current string at https://console.groq.com/docs/models
+// before relying on the default.
+const GROQ_MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b";
 
 // Excerpt length sent to the model per matched post. 2,500 chars ≈ 600-650
 // tokens. At 3 posts max that's ~1,900 tokens of context — well inside
@@ -315,7 +327,12 @@ router.post("/", chatLimiter, async (req, res) => {
     // still send a normal JSON error response with the right status code.
     if (!groqResponse.ok) {
       const errText = await groqResponse.text();
-      console.error("Groq API error:", groqResponse.status, errText);
+      console.error(
+        "Groq API error:",
+        groqResponse.status,
+        `(model: ${GROQ_MODEL})`,
+        errText,
+      );
       if (groqResponse.status === 429) {
         return res
           .status(429)
