@@ -692,6 +692,16 @@ app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
     const filepath = path.join(postsDir, filename);
     const metaDescription = postMeta.excerpt.replace(/"/g, "'");
     const canonicalUrl = `https://essence-blog.com/posts/${filename}`;
+    const formattedDate = new Date(postMeta.date).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    });
+    // Matches other real posts' style loosely: category plus a couple of
+    // generic terms. Real posts have hand-curated keywords per topic —
+    // this is a reasonable automatic stand-in, not a true equivalent.
+    const keywords = `${postMeta.category}, blog, Essence`;
+
     const html = `<!doctype html>
 <html lang="en">
 
@@ -699,93 +709,88 @@ app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="description" content="${escapeXml(metaDescription)}" />
+  <meta name="keywords" content="${escapeXml(keywords)}" />
+  <meta name="author" content="Efe" />
   <meta name="robots" content="index, follow" />
-  <title>${escapeXml(postMeta.title)} - Essence Blog</title>
-  <link rel="canonical" href="${canonicalUrl}" />
 
+  <!-- Open Graph -->
   <meta property="og:type" content="article" />
-  <meta property="og:url" content="${canonicalUrl}" />
-  <meta property="og:title" content="${escapeXml(postMeta.title)}" />
+  <meta property="og:title" content="${escapeXml(postMeta.title)} - Essence" />
   <meta property="og:description" content="${escapeXml(metaDescription)}" />
-  <meta property="og:site_name" content="Essence" />
+  <meta property="og:url" content="${canonicalUrl}" />
 
+  <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${escapeXml(postMeta.title)}" />
   <meta name="twitter:description" content="${escapeXml(metaDescription)}" />
 
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Essence" />
+  <title>${escapeXml(postMeta.title)} - Essence</title>
+  <link rel="canonical" href="${canonicalUrl}" />
+  <link rel="apple-touch-icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><circle cx='90' cy='90' r='85' fill='%233b82f6' opacity='0.1'/><circle cx='90' cy='90' r='75' fill='none' stroke='%233b82f6' stroke-width='3' opacity='0.3'/><circle cx='90' cy='90' r='65' fill='none' stroke='%233b82f6' stroke-width='3'/><path d='M 65 100 Q 90 60 115 100' stroke='%233b82f6' stroke-width='4' fill='none' stroke-linecap='round'/><circle cx='65' cy='100' r='4' fill='%233b82f6'/><circle cx='90' cy='60' r='4' fill='%233b82f6'/><circle cx='115' cy='100' r='4' fill='%233b82f6'/></svg>" />
   <link rel="manifest" href="../manifest.json" />
-  <link rel="stylesheet" href="../public/css/tokens.css" />
   <link rel="stylesheet" href="../styles.css" />
-  <link rel="stylesheet" href="../public/css/chat-widget.css" />
-  <link rel="stylesheet" href="../public/css/post-actions.css" />
+  <link rel="stylesheet" href="../public/css/chat-widget.css">
+  <link rel="stylesheet" href="../public/css/post-actions.css">
+  <link rel="stylesheet" href="../public/css/related-posts.css">
+  <!-- Favicon as SVG -->
+  <link rel="icon" type="image/svg+xml"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%233b82f6' opacity='0.1'/><circle cx='50' cy='50' r='40' fill='none' stroke='%233b82f6' stroke-width='2' opacity='0.3'/><circle cx='50' cy='50' r='35' fill='none' stroke='%233b82f6' stroke-width='2'/><path d='M 35 55 Q 50 35 65 55' stroke='%233b82f6' stroke-width='2.5' fill='none' stroke-linecap='round'/><circle cx='35' cy='55' r='2' fill='%233b82f6'/><circle cx='50' cy='35' r='2' fill='%233b82f6'/><circle cx='65' cy='55' r='2' fill='%233b82f6'/></svg>" />
 
-  <script type="application/ld+json">{ "@context": "https://schema.org", "@type": "BlogPosting", "@id": "${canonicalUrl}", "headline": "${escapeXml(postMeta.title)}", "description": "${escapeXml(metaDescription)}", "datePublished": "${postMeta.date}" }</script>
+  <!-- JSON-LD Article Schema -->
+  <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": "${escapeXml(postMeta.title)}",
+        "description": "${escapeXml(metaDescription)}",
+        "datePublished": "${postMeta.date}",
+        "dateModified": "${postMeta.date}",
+        "author": {
+          "@type": "Person",
+          "name": "Efe"
+        },
+        "publisher": {
+          "@type": "Organization",
+          "name": "Essence Blog",
+          "logo": {
+            "@type": "ImageObject",
+            "url": "https://essence-blog.com/logo.png"
+          }
+        },
+        "mainEntityOfPage": {
+          "@type": "WebPage",
+          "@id": "${canonicalUrl}"
+        }
+      }
+    </script>
 </head>
 
 <body>
-  <button class="back-to-top">↑</button>
-  <div class="reading-progress"></div>
-  <button class="theme-toggle">🌙</button>
-  <button id="auth-btn" class="auth-header-btn">👤 Login</button>
-
-  <div id="auth-modal" class="modal hidden">
-    <div class="modal-content auth-modal">
-      <button class="modal-close">&times;</button>
-      <div id="auth-tabs" class="auth-tabs">
-        <button class="auth-tab active" data-tab="login">Login</button>
-        <button class="auth-tab" data-tab="register">Register</button>
-      </div>
-      <form id="login-form" class="auth-form active">
-        <h2>Login</h2>
-        <input type="email" id="login-email" placeholder="Email" required />
-        <input type="password" id="login-password" placeholder="Password" required />
-        <button type="submit" class="btn">Login</button>
-        <p class="auth-message" id="login-message"></p>
-      </form>
-      <form id="register-form" class="auth-form">
-        <h2>Create Account</h2>
-        <input type="text" id="register-username" placeholder="Username" required />
-        <input type="email" id="register-email" placeholder="Email" required />
-        <input type="password" id="register-password" placeholder="Password (min 6 chars)" required />
-        <input type="password" id="register-confirm" placeholder="Confirm Password" required />
-        <button type="submit" class="btn">Register</button>
-        <p class="auth-message" id="register-message"></p>
-      </form>
-    </div>
-  </div>
-
-  <div id="user-profile-dropdown" class="user-dropdown hidden">
-    <div id="user-info" class="user-info"></div>
-    <button id="logout-btn" class="btn btn-secondary">Logout</button>
-  </div>
-
-  <header class="site-header" id="top">
-    <div class="hero-gradient"></div>
-    <div class="header-content">
-      <h1 class="main-title">${escapeXml(postMeta.title)}</h1>
-      <p class="tagline">${new Date(postMeta.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} • ${escapeXml(postMeta.category)}</p>
+  <header class="site-header">
+    <div class="header-top">
+      <a href="../index.html" class="back-btn">← Back</a>
+      <h1>${escapeXml(postMeta.title)}</h1>
+      <button id="theme-toggle" class="theme-btn" title="Toggle dark mode">
+        🌙
+      </button>
     </div>
   </header>
 
   <main class="container">
-    <article class="post-preview post-article">
-      <div class="post-content">
+    <article class="post-preview">
+      <p class="post-meta">${formattedDate}</p>
+      <h1>${escapeXml(postMeta.title)}</h1>
+      <!-- Real posts (e.g. post1.html) wrap this in a second, nested
+           <main> — invalid HTML (main must not be a descendant of
+           another main), so this uses a plain div instead. Also: real
+           posts have a hand-picked hero image here; the admin form
+           doesn't collect one, so there isn't one to insert. -->
+      <div>
         ${sanitizedContent}
-      </div>
-
-      <div class="share-buttons">
-        <button class="share-btn" data-share="X" title="Share on X" aria-label="Share on X">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.9 2h3.4l-7.4 8.5L24 22h-6.7l-5.2-6.8L5.7 22H2.3l7.9-9.1L0 2h6.9l4.7 6.2L18.9 2Zm-1.2 18h1.3L6.3 4H4.9l13.8 16Z" /></svg>
-        </button>
-        <button class="share-btn" data-share="facebook" title="Share on Facebook" aria-label="Share on Facebook">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.7 22v-8.9h3l.4-3.4h-3.4V4.8c0-1 .3-1.7 1.7-1.7h1.8V.1c-.3 0-1.4-.1-2.7-.1-2.7 0-4.5 1.6-4.5 4.6v2.6H7.4v3.4h3.1V22h3.2Z" /></svg>
-        </button>
-        <button class="share-btn" data-share="linkedin" title="Share on LinkedIn" aria-label="Share on LinkedIn">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.9 8.2A1.8 1.8 0 1 0 6.9 4.6a1.8 1.8 0 0 0 0 3.6ZM5.3 9.7h3.2V19H5.3V9.7Zm5.4 0h3.1v1.3h.1c.4-.8 1.5-1.7 3.1-1.7 3.3 0 3.9 2.2 3.9 5v9.7h-3.2v-9.1c0-2.2-.1-5-3-5-3 0-3.5 2.3-3.5 4.7v9.4H10.7V9.7Z" /></svg>
-        </button>
-        <button class="share-btn" data-share="copy" title="Copy link" aria-label="Copy link">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 6.5H6.6a2.8 2.8 0 0 0-2.8 2.8v3.7a2.8 2.8 0 0 0 2.8 2.8h3.7a2.8 2.8 0 0 0 2.8-2.8V9.3a2.8 2.8 0 0 0-2.8-2.8Zm-3.7 2.8h3.7v3.7H6.6V9.3Zm4.7 4.8h1.6a2.8 2.8 0 0 1 2.8 2.8v3.7a2.8 2.8 0 0 1-2.8 2.8H9.2a2.8 2.8 0 0 1-2.8-2.8v-1.6h1.8v1.6h3.7v-3.7H11.3v-1.6Z" /></svg>
-        </button>
       </div>
 
       <section class="comments-section" data-post-id="${escapeXml(postMeta.id)}">
@@ -798,22 +803,41 @@ app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
           <button class="comment-submit">Post Comment</button>
         </div>
       </section>
-
-      <div class="back-link">
-        <a href="../index.html">← Back to Home</a>
-      </div>
     </article>
+
+    <aside class="sidebar">
+      <h3>About</h3>
+      <p>Sharing Knowledge, Ideas, and Inspiration Every Day.</p>
+    </aside>
   </main>
 
   <footer class="site-footer">
-    <p>&copy; ${new Date(postMeta.date).getFullYear()} Essence Blog. All rights reserved.</p>
-    <p>Built with ❤️ using vanilla JavaScript, HTML, and CSS</p>
+    <div class="footer-content">
+      <div class="footer-section">
+        <h4>About</h4>
+        <p>A modern blog built with simplicity in mind.</p>
+      </div>
+      <div class="footer-section">
+        <h4>Pages</h4>
+        <ul>
+          <li><a href="../index.html">Home</a></li>
+          <li><a href="../index.html#posts-section">All Posts</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>&copy; ${new Date(postMeta.date).getFullYear()} — Efe. Built with ❤️</p>
+    </div>
   </footer>
-
-  <script src="../script.js" defer></script>
-  <script src="../public/js/chat-widget.js"></script>
-  <script src="../public/js/post-actions.js"></script>
+  <!-- Back to Top Button -->
+  <button class="back-to-top" title="Back to top">
+    <span>⬆️</span>
+  </button>
 </body>
+<script src="../script.js"></script>
+<script src="../public/js/chat-widget.js"></script>
+<script src="../public/js/post-actions.js"></script>
+<script src="../public/js/related-posts.js"></script>
 
 </html>`;
 

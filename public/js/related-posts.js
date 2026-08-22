@@ -12,9 +12,21 @@
 //   <script src="../public/js/related-posts.js"></script>
 
 (function () {
-  const match = window.location.pathname.match(/post(\d+)\.html/);
-  if (!match) return;
-  const currentSlug = `post${match[1]}`;
+  // Legacy posts (post1..post16): posts.id is a bare number, decoupled
+  // from the slug ("post5.html" -> id "5"). Admin-created posts: id and
+  // slug are the SAME string (server.js sets postMeta.slug = id on
+  // creation), so for those the full slug IS the real id/slug. Try the
+  // legacy numeric pattern first; fall back to the full slug otherwise —
+  // that fallback is exactly what previously made this whole widget
+  // silently never render on any admin-created post (the old regex
+  // required digits immediately after "post", which a title-based or
+  // hyphenated slug never has).
+  const slugMatch = window.location.pathname.match(/\/posts\/([^/]+)\.html/);
+  if (!slugMatch) return;
+  const slug = slugMatch[1];
+  const legacyMatch = slug.match(/^post(\d+)$/);
+  const currentId = legacyMatch ? legacyMatch[1] : slug;
+  const currentSlug = slug;
 
   function el(tag, className, text) {
     const e = document.createElement(tag);
@@ -33,7 +45,7 @@
       return; // fail silently — related posts are a nice-to-have, not critical
     }
 
-    const currentPost = posts.find((p) => p.slug === currentSlug || p.id === match[1]);
+    const currentPost = posts.find((p) => p.slug === currentSlug || p.id === currentId);
     if (!currentPost || !currentPost.category) return;
 
     const related = posts
