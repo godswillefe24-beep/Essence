@@ -687,7 +687,7 @@
       const commentsCount = section.querySelector(".comments-count");
       if (!postId || !commentsList || !commentsCount) return;
 
-      let localComments = [];
+      let allComments = [];
 
       const escapeHtml = (text) => {
         const div = document.createElement("div");
@@ -695,59 +695,104 @@
         return div.innerHTML;
       };
 
+      const renderReplyForm = (parentId) => `
+        <form class="comment-reply-form hidden" data-parent-id="${parentId}">
+          ${authManager.user ? "" : '<input type="text" class="comment-reply-name" placeholder="Your name..." />'}
+          <textarea rows="2" placeholder="Write a reply..."></textarea>
+          <button type="submit">Post reply</button>
+        </form>`;
+
+      const renderOneComment = (comment, isReply) => `
+        <div class="comment-item${isReply ? " is-reply" : ""}" data-comment-id="${comment.id}">
+          <div class="comment-header">
+            <div>
+              <span class="comment-author">👤 ${escapeHtml(comment.name)}</span>
+              <span class="comment-time">${formatRelativeTime(comment.timestamp)}</span>
+            </div>
+          </div>
+          <p class="comment-text">${escapeHtml(comment.text)}</p>
+          ${isReply ? "" : `<button class="comment-reply" type="button" data-comment-id="${comment.id}">Reply</button>${renderReplyForm(comment.id)}`}
+        </div>`;
+
       const renderComments = (comments) => {
+        // API returns a flat list ordered by timestamp DESC. Build a
+        // two-level tree: top-level comments (parentId null) each with
+        // their replies nested directly beneath, oldest-reply-first so a
+        // reply thread reads top-to-bottom in the order it happened.
+        // Replies don't get their own Reply button/form — one level of
+        // nesting only, matching most blogs' comment UX and avoiding
+        // unbounded thread depth.
+        const topLevel = comments.filter((c) => !c.parentId);
+        const repliesByParent = {};
+        comments
+          .filter((c) => c.parentId)
+          .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
+          .forEach((r) => {
+            (repliesByParent[r.parentId] ||= []).push(r);
+          });
+
         commentsCount.textContent = comments.length;
         commentsList.innerHTML =
-          comments.length > 0
-            ? comments
+          topLevel.length > 0
+            ? topLevel
                 .map(
-                  (comment) => `
-              <div class="comment-item${comment.parentId ? " comment-reply" : ""}" data-comment-id="${comment.id}">
-                <div class="comment-header">
-                  <div>
-                    <span class="comment-author">👤 ${escapeHtml(comment.name)}</span>
-                    <span class="comment-time">${formatRelativeTime(comment.timestamp)}</span>
-                  </div>
-                </div>
-                <p class="comment-text">${escapeHtml(comment.text)}</p>
-                <button class="comment-reply-btn" type="button" data-comment-id="${comment.id}">Reply</button>
-                <form class="comment-reply-form hidden">
-                  <textarea rows="2" placeholder="Write a reply..."></textarea>
-                  <button type="submit">Post reply</button>
-                </form>
-              </div>`,
+                  (comment) =>
+                    renderOneComment(comment, false) +
+                    (repliesByParent[comment.id] || [])
+                      .map((reply) => renderOneComment(reply, true))
+                      .join(""),
                 )
                 .join("")
             : '<div class="no-comments">Be the first to comment! 💭</div>';
 
-        commentsList
-          .querySelectorAll(".comment-reply-btn")
-          .forEach((button) => {
-            button.addEventListener("click", () => {
-              const form = button.parentElement.querySelector(
-                ".comment-reply-form",
-              );
-              form?.classList.toggle("hidden");
-              form?.querySelector("textarea")?.focus();
-            });
+        commentsList.querySelectorAll(".comment-reply").forEach((button) => {
+          button.addEventListener("click", () => {
+            const form = button.nextElementSibling;
+            form?.classList.toggle("hidden");
+            form?.querySelector("textarea")?.focus();
           });
+        });
 
         commentsList.querySelectorAll(".comment-reply-form").forEach((form) => {
-          form.addEventListener("submit", (event) => {
+          form.addEventListener("submit", async (event) => {
             event.preventDefault();
             const textarea = form.querySelector("textarea");
+            const nameField = form.querySelector(".comment-reply-name");
             const replyText = textarea?.value.trim();
+            const parentId = form.dataset.parentId;
             if (!replyText) return;
-            const parentId = form.closest(".comment-item")?.dataset.commentId;
-            const newReply = {
-              id: `reply-${Date.now()}`,
-              parentId,
-              name: authManager.user?.username || "You",
-              text: replyText,
-              timestamp: new Date().toISOString(),
-            };
-            localComments = [...localComments, newReply];
-            renderComments([...localComments]);
+            if (!authManager.user && !nameField?.value.trim()) {
+              showNotification("Please enter your name", "error");
+              nameField?.focus();
+              return;
+            }
+
+            const submitBtn = form.querySelector("button[type=submit]");
+            submitBtn.disabled = true;
+            try {
+              const headers = { "Content-Type": "application/json" };
+              if (authManager.token)
+                headers.Authorization = `Bearer ${authManager.token}`;
+              const response = await fetch(`${API_BASE}/comments`, {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                  postId,
+                  parentId,
+                  name: nameField?.value.trim() || "",
+                  text: replyText,
+                }),
+              });
+              if (response.ok) {
+                await loadComments();
+              } else {
+                showNotification("Failed to post reply", "error");
+              }
+            } catch {
+              showNotification("Failed to post reply", "error");
+            } finally {
+              submitBtn.disabled = false;
+            }
           });
         });
       };
@@ -757,14 +802,14 @@
           const response = await fetch(`${API_BASE}/comments/${postId}`);
           if (response.ok) {
             const comments = await response.json();
-            localComments = comments;
-            renderComments(localComments);
+            allComments = comments;
+            renderComments(allComments);
             return;
           }
         } catch (error) {
           // Ignore and fall back to the empty state.
         }
-        renderComments(localComments);
+        renderComments(allComments);
       };
 
       if (authManager.user && nameInput) nameInput.style.display = "none";

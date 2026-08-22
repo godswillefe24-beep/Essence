@@ -207,6 +207,7 @@ function mapComment(row) {
     name: row.name,
     text: row.text,
     timestamp: row.timestamp,
+    parentId: row.parent_id || null,
   };
 }
 
@@ -259,17 +260,32 @@ app.get("/api/comments/:postId", async (req, res) => {
 // API: Post a new comment
 app.post("/api/comments", commentLimiter, async (req, res) => {
   try {
-    const { postId, name, text } = req.body;
+    const { postId, name, text, parentId } = req.body;
 
     const sanitizedPostId = sanitizeString(postId);
     const sanitizedName = sanitizeString(name || "Anonymous");
     const sanitizedText = sanitizeString(text);
+    const sanitizedParentId = parentId ? sanitizeString(parentId) : null;
 
     if (!sanitizedPostId || !sanitizedText || sanitizedText.length < 2) {
       return res.status(400).json({
         error:
           "Missing or invalid required fields (name, text required, min 2 chars)",
       });
+    }
+
+    // A reply must actually be replying to something real, on the same
+    // post — otherwise a client could post a "reply" pointing at an id
+    // that doesn't exist (or belongs to a different post entirely) and
+    // it would render as an orphaned/mismatched nested comment.
+    if (sanitizedParentId) {
+      const parent = await get(
+        "SELECT id FROM comments WHERE id = ? AND post_id = ?",
+        [sanitizedParentId, sanitizedPostId],
+      );
+      if (!parent) {
+        return res.status(400).json({ error: "Invalid comment to reply to" });
+      }
     }
 
     const authHeader = req.headers.authorization;
@@ -295,10 +311,11 @@ app.post("/api/comments", commentLimiter, async (req, res) => {
       name: userName,
       text: sanitizedText,
       timestamp: new Date().toISOString(),
+      parentId: sanitizedParentId,
     };
 
     await run(
-      `INSERT INTO comments (id, post_id, user_id, name, text, timestamp) VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO comments (id, post_id, user_id, name, text, timestamp, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         newComment.id,
         newComment.postId,
@@ -306,6 +323,7 @@ app.post("/api/comments", commentLimiter, async (req, res) => {
         newComment.name,
         newComment.text,
         newComment.timestamp,
+        newComment.parentId,
       ],
     );
 
@@ -323,19 +341,27 @@ app.post("/api/comments", commentLimiter, async (req, res) => {
   }
 });
 
-// API: Get all comments (admin only)
+// API: Get all comments (admin only) — top-level only. Replies are
+// intentionally excluded here so they don't clutter the moderation list
+// as if they were separate comments; deleting a top-level comment via
+// DELETE /api/admin/comments/:id also removes its replies (see below).
 app.get("/api/admin/comments", verifyAdmin, async (req, res) => {
   try {
-    res.json(await readComments());
+    const rows = await all(
+      "SELECT * FROM comments WHERE parent_id IS NULL ORDER BY timestamp DESC",
+    );
+    res.json(rows.map(mapComment));
   } catch (error) {
     logError("Admin get comments", error);
     res.status(500).json({ error: "Failed to fetch comments" });
   }
 });
 
-// API: Delete a comment (admin only)
+// API: Delete a comment (admin only) — also deletes any replies to it,
+// so moderation can't leave orphaned replies with no visible parent.
 app.delete("/api/admin/comments/:id", verifyAdmin, async (req, res) => {
   try {
+    await run("DELETE FROM comments WHERE parent_id = ?", [req.params.id]);
     const { rowsAffected } = await run("DELETE FROM comments WHERE id = ?", [
       req.params.id,
     ]);
@@ -665,35 +691,135 @@ app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
     const filename = `${postMeta.slug}.html`;
     const filepath = path.join(postsDir, filename);
     const metaDescription = postMeta.excerpt.replace(/"/g, "'");
+    const canonicalUrl = `https://essence-blog.com/posts/${filename}`;
     const html = `<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>${escapeXml(postMeta.title)}</title>
-    <meta name="description" content="${escapeXml(metaDescription)}" />
-    <meta property="og:title" content="${escapeXml(postMeta.title)}" />
-    <meta property="og:description" content="${escapeXml(metaDescription)}" />
-    <script type="application/ld+json">{ "@context": "https://schema.org", "@type": "BlogPosting", "headline": "${escapeXml(postMeta.title)}", "datePublished": "${postMeta.date}" }</script>
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
-    <article class="post">
-      <header>
-        <h1>${escapeXml(postMeta.title)}</h1>
-        <p class="meta">${new Date(postMeta.date).toLocaleString()} \u2022 ${escapeXml(postMeta.category)}</p>
-      </header>
-      <section class="content">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="${escapeXml(metaDescription)}" />
+  <meta name="robots" content="index, follow" />
+  <title>${escapeXml(postMeta.title)} - Essence Blog</title>
+  <link rel="canonical" href="${canonicalUrl}" />
+
+  <meta property="og:type" content="article" />
+  <meta property="og:url" content="${canonicalUrl}" />
+  <meta property="og:title" content="${escapeXml(postMeta.title)}" />
+  <meta property="og:description" content="${escapeXml(metaDescription)}" />
+  <meta property="og:site_name" content="Essence" />
+
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="${escapeXml(postMeta.title)}" />
+  <meta name="twitter:description" content="${escapeXml(metaDescription)}" />
+
+  <link rel="manifest" href="../manifest.json" />
+  <link rel="stylesheet" href="../public/css/tokens.css" />
+  <link rel="stylesheet" href="../styles.css" />
+  <link rel="stylesheet" href="../public/css/chat-widget.css" />
+  <link rel="stylesheet" href="../public/css/post-actions.css" />
+
+  <script type="application/ld+json">{ "@context": "https://schema.org", "@type": "BlogPosting", "@id": "${canonicalUrl}", "headline": "${escapeXml(postMeta.title)}", "description": "${escapeXml(metaDescription)}", "datePublished": "${postMeta.date}" }</script>
+</head>
+
+<body>
+  <button class="back-to-top">↑</button>
+  <div class="reading-progress"></div>
+  <button class="theme-toggle">🌙</button>
+  <button id="auth-btn" class="auth-header-btn">👤 Login</button>
+
+  <div id="auth-modal" class="modal hidden">
+    <div class="modal-content auth-modal">
+      <button class="modal-close">&times;</button>
+      <div id="auth-tabs" class="auth-tabs">
+        <button class="auth-tab active" data-tab="login">Login</button>
+        <button class="auth-tab" data-tab="register">Register</button>
+      </div>
+      <form id="login-form" class="auth-form active">
+        <h2>Login</h2>
+        <input type="email" id="login-email" placeholder="Email" required />
+        <input type="password" id="login-password" placeholder="Password" required />
+        <button type="submit" class="btn">Login</button>
+        <p class="auth-message" id="login-message"></p>
+      </form>
+      <form id="register-form" class="auth-form">
+        <h2>Create Account</h2>
+        <input type="text" id="register-username" placeholder="Username" required />
+        <input type="email" id="register-email" placeholder="Email" required />
+        <input type="password" id="register-password" placeholder="Password (min 6 chars)" required />
+        <input type="password" id="register-confirm" placeholder="Confirm Password" required />
+        <button type="submit" class="btn">Register</button>
+        <p class="auth-message" id="register-message"></p>
+      </form>
+    </div>
+  </div>
+
+  <div id="user-profile-dropdown" class="user-dropdown hidden">
+    <div id="user-info" class="user-info"></div>
+    <button id="logout-btn" class="btn btn-secondary">Logout</button>
+  </div>
+
+  <header class="site-header" id="top">
+    <div class="hero-gradient"></div>
+    <div class="header-content">
+      <h1 class="main-title">${escapeXml(postMeta.title)}</h1>
+      <p class="tagline">${new Date(postMeta.date).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })} • ${escapeXml(postMeta.category)}</p>
+    </div>
+  </header>
+
+  <main class="container">
+    <article class="post-preview post-article">
+      <div class="post-content">
         ${sanitizedContent}
+      </div>
+
+      <div class="share-buttons">
+        <button class="share-btn" data-share="X" title="Share on X" aria-label="Share on X">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.9 2h3.4l-7.4 8.5L24 22h-6.7l-5.2-6.8L5.7 22H2.3l7.9-9.1L0 2h6.9l4.7 6.2L18.9 2Zm-1.2 18h1.3L6.3 4H4.9l13.8 16Z" /></svg>
+        </button>
+        <button class="share-btn" data-share="facebook" title="Share on Facebook" aria-label="Share on Facebook">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.7 22v-8.9h3l.4-3.4h-3.4V4.8c0-1 .3-1.7 1.7-1.7h1.8V.1c-.3 0-1.4-.1-2.7-.1-2.7 0-4.5 1.6-4.5 4.6v2.6H7.4v3.4h3.1V22h3.2Z" /></svg>
+        </button>
+        <button class="share-btn" data-share="linkedin" title="Share on LinkedIn" aria-label="Share on LinkedIn">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.9 8.2A1.8 1.8 0 1 0 6.9 4.6a1.8 1.8 0 0 0 0 3.6ZM5.3 9.7h3.2V19H5.3V9.7Zm5.4 0h3.1v1.3h.1c.4-.8 1.5-1.7 3.1-1.7 3.3 0 3.9 2.2 3.9 5v9.7h-3.2v-9.1c0-2.2-.1-5-3-5-3 0-3.5 2.3-3.5 4.7v9.4H10.7V9.7Z" /></svg>
+        </button>
+        <button class="share-btn" data-share="copy" title="Copy link" aria-label="Copy link">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10.3 6.5H6.6a2.8 2.8 0 0 0-2.8 2.8v3.7a2.8 2.8 0 0 0 2.8 2.8h3.7a2.8 2.8 0 0 0 2.8-2.8V9.3a2.8 2.8 0 0 0-2.8-2.8Zm-3.7 2.8h3.7v3.7H6.6V9.3Zm4.7 4.8h1.6a2.8 2.8 0 0 1 2.8 2.8v3.7a2.8 2.8 0 0 1-2.8 2.8H9.2a2.8 2.8 0 0 1-2.8-2.8v-1.6h1.8v1.6h3.7v-3.7H11.3v-1.6Z" /></svg>
+        </button>
+      </div>
+
+      <section class="comments-section" data-post-id="${escapeXml(postMeta.id)}">
+        <h3>💬 Comments (<span class="comments-count">0</span>)</h3>
+        <div class="comments-list"></div>
+        <div class="comment-form">
+          <h4>Leave a Comment</h4>
+          <input type="text" class="comment-name" placeholder="Your name..." />
+          <textarea class="comment-text" placeholder="Share your thoughts..." rows="4"></textarea>
+          <button class="comment-submit">Post Comment</button>
+        </div>
       </section>
+
+      <div class="back-link">
+        <a href="../index.html">← Back to Home</a>
+      </div>
     </article>
-    <script src="/script.js" defer></script>
-  </body>
+  </main>
+
+  <footer class="site-footer">
+    <p>&copy; ${new Date(postMeta.date).getFullYear()} Essence Blog. All rights reserved.</p>
+    <p>Built with ❤️ using vanilla JavaScript, HTML, and CSS</p>
+  </footer>
+
+  <script src="../script.js" defer></script>
+  <script src="../public/js/chat-widget.js"></script>
+  <script src="../public/js/post-actions.js"></script>
+</body>
+
 </html>`;
 
     fs.writeFileSync(filepath, html, "utf8");
 
-    res.json({ success: true, id, url: `/posts/${filename}` });
+    res.json({ success: true, id: postMeta.id, url: `/posts/${filename}` });
   } catch (error) {
     logError("Create post", error);
     res.status(500).json({ error: "Failed to save post" });

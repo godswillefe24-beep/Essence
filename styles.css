@@ -895,6 +895,68 @@ body.dark-mode {
   color: var(--accent);
 }
 
+/* Nested reply — indented and visually subordinate to its parent comment.
+   Previously this indent never applied to anything: script.js applied a
+   class named .comment-reply here, which collided with (and was shadowed
+   by) the button styling above meant for the Reply button itself. */
+.comment-item.is-reply {
+  margin-left: 2rem;
+  margin-top: 0.75rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--border);
+}
+
+.comment-reply-form {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.comment-reply-form.hidden {
+  display: none;
+}
+
+.comment-reply-form textarea,
+.comment-reply-form input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--card, #fff);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+.comment-reply-form textarea:focus,
+.comment-reply-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.comment-reply-form button[type="submit"] {
+  align-self: flex-start;
+  padding: 0.4rem 1rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: opacity 0.2s ease;
+}
+
+.comment-reply-form button[type="submit"]:hover {
+  opacity: 0.9;
+}
+
+.comment-reply-form button[type="submit"]:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* COMMENT FORM */
 .comment-form {
   background: linear-gradient(
