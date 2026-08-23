@@ -53,14 +53,19 @@ copy .env.example .env
 | `EMAIL_USER`, `EMAIL_PASSWORD` | Gmail app password for subscription emails |
 | `SENDGRID_API_KEY`, `EMAIL_FROM` | SendGrid alternative for emails |
 | `MAILCHIMP_API_KEY`, `MAILCHIMP_LIST_ID` | Mailchimp list sync |
+| `CORS_ORIGINS` | Comma-separated browser origins allowed for cross-origin API access; leave empty for same-origin only |
 
 ### 3. Initialize the database
+
+Run the idempotent migration after each schema release. It creates the durable `analytics_sessions` and `analytics_events` tables used by the admin analytics dashboard.
 
 ```bash
 node migrate.js
 ```
 
-This creates all tables, seeds the 16 post metadata records, and hashes `ADMIN_PASSWORD` into the settings table.
+Authentication sessions are issued as `HttpOnly` cookies. In production, set `NODE_ENV=production` and serve the site over HTTPS so the cookie also receives the `Secure` attribute.
+
+This creates all tables, applies required schema upgrades, seeds the 16 post metadata records, and hashes `ADMIN_PASSWORD` into the settings table. If you are upgrading a database that already contains legacy posts, run `node backfill-post-content.js` once afterward so the admin editor can load their full bodies from the database.
 
 ### 4. Enable semantic chat search (optional)
 
@@ -112,6 +117,7 @@ Essence/
 
 | Method | Path | Description |
 |--------|------|-------------|
+| GET | `/health` | Liveness health check |
 | GET | `/api/posts` | List all posts |
 | GET | `/api/comments/:postId` | Comments for a post |
 | POST | `/api/comments` | Post a comment |

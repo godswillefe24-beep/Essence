@@ -291,6 +291,9 @@ class AnalyticsTracker {
     this.startTime = Date.now();
     this.pageViews = [];
     this.events = [];
+    this.scrollDepth75Tracked = false;
+    this.flushTimer = null;
+    this.sending = false;
   }
 
   generateSessionId() {
@@ -309,32 +312,57 @@ class AnalyticsTracker {
   trackEvent(eventName, eventData = {}) {
     this.events.push({
       name: eventName,
-      data: eventData,
+      data: {
+        page: window.location.pathname,
+        ...(eventData && typeof eventData === "object" ? eventData : {}),
+      },
       timestamp: new Date().toISOString(),
     });
+    this.scheduleSend();
+  }
+
+  scheduleSend() {
+    clearTimeout(this.flushTimer);
+    this.flushTimer = setTimeout(() => this.sendAnalytics(), 1500);
   }
 
   trackScrollDepth() {
-    const scrollPercentage =
-      (window.scrollY /
-        (document.documentElement.scrollHeight - window.innerHeight)) *
-      100;
+    const scrollableHeight =
+      document.documentElement.scrollHeight - window.innerHeight;
+    if (scrollableHeight <= 0 || this.scrollDepth75Tracked) return;
+
+    const scrollPercentage = (window.scrollY / scrollableHeight) * 100;
     if (scrollPercentage > 75) {
       this.trackEvent("scroll_depth_75%");
+      this.scrollDepth75Tracked = true;
     }
   }
 
-  sendAnalytics() {
-    // Send analytics data to server
-    fetch("/api/analytics", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        sessionId: this.sessionId,
-        pageViews: this.pageViews,
-        events: this.events,
-      }),
-    }).catch((e) => console.log("Analytics tracking:", e));
+  async sendAnalytics() {
+    if (this.sending || (!this.pageViews.length && !this.events.length)) return;
+    this.sending = true;
+    const pageViews = [...this.pageViews];
+    const events = [...this.events];
+
+    try {
+      const response = await fetch("/api/analytics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId: this.sessionId,
+          pageViews,
+          events,
+        }),
+      });
+      if (!response.ok) throw new Error(`analytics request failed (${response.status})`);
+      this.pageViews.splice(0, pageViews.length);
+      this.events.splice(0, events.length);
+    } catch (e) {
+      console.log("Analytics tracking:", e);
+    } finally {
+      this.sending = false;
+      if (this.pageViews.length || this.events.length) this.scheduleSend();
+    }
   }
 }
 
@@ -485,7 +513,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // stacked on the same page.
   initLazyLoading();
   initKeyboardShortcuts();
-  initAdvancedSearch();
+  // The main script already loads the paginated post list. Do not issue a
+  // second full-catalog request here; advanced search remains available as an
+  // explicit opt-in helper for pages that need it.
 
   console.log("✓ Blog enhancements loaded");
 });

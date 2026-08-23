@@ -1507,6 +1507,49 @@ body.dark-mode {
   color: var(--muted);
 }
 
+.post-skeleton {
+  min-height: 230px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.post-skeleton span {
+  display: block;
+  height: 14px;
+  background: var(--border);
+  border-radius: 6px;
+}
+
+.post-skeleton span:first-child {
+  width: 32%;
+  height: 10px;
+}
+
+.post-skeleton span:nth-child(2) {
+  width: 88%;
+  height: 22px;
+}
+
+.post-skeleton span:last-child {
+  width: 68%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}
+
 /* SIDEBAR */
 .sidebar {
   position: sticky;

@@ -29,15 +29,31 @@ async function applySchema() {
   }
   console.log(`Schema applied (${statements.length} statements).`);
 
-  // Idempotent: add embedding column if this database predates semantic search.
-  try {
-    await db.execute("ALTER TABLE posts ADD COLUMN embedding TEXT");
-    console.log("Added posts.embedding column.");
-  } catch (err) {
-    if (!/duplicate column name/i.test(err.message)) {
-      throw err;
+  // Keep upgrades safe for databases created from an older schema. The
+  // CREATE TABLE statements above cover fresh databases; these ALTER TABLE
+  // statements cover existing ones without requiring separate SQL files.
+  const legacyColumns = [
+    ["posts", "content", "TEXT"],
+    ["posts", "embedding", "TEXT"],
+    ["comments", "parent_id", "TEXT"],
+  ];
+
+  for (const [table, column, definition] of legacyColumns) {
+    try {
+      await db.execute(
+        `ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`,
+      );
+      console.log(`Added ${table}.${column} column.`);
+    } catch (err) {
+      if (!/duplicate column name/i.test(err.message)) {
+        throw err;
+      }
     }
   }
+
+  await db.execute(
+    "CREATE INDEX IF NOT EXISTS idx_comments_parent_id ON comments (parent_id)",
+  );
 }
 
 async function seedPosts() {
@@ -248,7 +264,9 @@ async function seedSettings() {
           VALUES (1, ?, ?, ?)`,
     args: ["Essence", "A modern blog", passwordHash],
   });
-  console.log("Settings seeded (admin password hashed from ADMIN_PASSWORD env var).");
+  console.log(
+    "Settings seeded (admin password hashed from ADMIN_PASSWORD env var).",
+  );
 }
 
 async function seedSiteStats() {
@@ -267,7 +285,9 @@ async function main() {
   await seedSettings();
   await seedSiteStats();
   console.log("\nMigration complete.");
-  console.log("Next: node embed-posts.js (after setting HF_TOKEN for AI chat search).");
+  console.log(
+    "Next: node embed-posts.js (after setting HF_TOKEN for AI chat search).",
+  );
 }
 
 main().catch((err) => {

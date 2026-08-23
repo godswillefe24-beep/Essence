@@ -1,6 +1,18 @@
 (() => {
   const API_BASE = `${window.location.origin}/api`;
 
+  const escapeHtml = (value) =>
+    String(value ?? "").replace(/[&<>"']/g, (character) => {
+      const entities = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      };
+      return entities[character];
+    });
+
   class BlogDatabase {
     constructor() {
       this.dbName = "BlogDB";
@@ -53,14 +65,17 @@
 
   class AuthManager {
     constructor() {
-      this.token = localStorage.getItem("auth_token");
+      // Authentication is held in an HttpOnly cookie; only non-sensitive
+      // profile display data remains in localStorage.
+      this.token = null;
       this.user = JSON.parse(localStorage.getItem("auth_user") || "null");
+      localStorage.removeItem("auth_token");
     }
 
     init() {
       this.setupAuthUI();
       this.setupAuthModal();
-      if (this.token) {
+      if (this.user) {
         this.defer(this.validateToken.bind(this));
       }
     }
@@ -168,8 +183,8 @@
           body: JSON.stringify({ email, password }),
         });
         const data = await response.json();
-        if (response.ok && data.token && data.user) {
-          this.setAuth(data.token, data.user);
+        if (response.ok && data.user) {
+          this.setAuth(data.user);
           message.textContent = "Login successful!";
           message.className = "auth-message success";
           setTimeout(() => {
@@ -205,7 +220,7 @@
         });
         const data = await response.json();
         if (response.ok) {
-          this.setAuth(data.token, data.user);
+          this.setAuth(data.user);
           message.textContent = "Account created successfully!";
           message.className = "auth-message success";
           setTimeout(() => {
@@ -223,10 +238,9 @@
       }
     }
 
-    setAuth(token, user) {
-      this.token = token;
+    setAuth(user) {
+      this.token = null;
       this.user = user;
-      localStorage.setItem("auth_token", token);
       localStorage.setItem("auth_user", JSON.stringify(user));
     }
 
@@ -235,6 +249,11 @@
       this.user = null;
       localStorage.removeItem("auth_token");
       localStorage.removeItem("auth_user");
+      fetch(`${API_BASE}/auth/logout`, {
+        method: "POST",
+        credentials: "include",
+        keepalive: true,
+      }).catch(() => {});
       location.reload();
     }
 
@@ -242,7 +261,7 @@
       try {
         const response = await fetch(`${API_BASE}/auth/validate`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${this.token}` },
+          credentials: "include",
         });
         if (!response.ok) {
           this.logout();
@@ -425,19 +444,28 @@
       }
 
       postsGrid.innerHTML = posts
-        .map(
-          (post) => `
-            <article class="post-card" data-post-id="${post.id}">
+        .map((post) => {
+          const postUrl = `posts/${encodeURIComponent(post.slug || post.id)}.html`;
+          const date = new Date(post.date);
+          const displayDate = Number.isNaN(date.getTime())
+            ? "Date unavailable"
+            : date.toLocaleDateString(undefined, {
+                year: "numeric",
+                month: "short",
+                day: "numeric",
+              });
+          return `
+            <article class="post-card" data-post-id="${escapeHtml(post.id)}">
               <div class="post-header">
-                <div class="post-category">${post.category || "Uncategorized"}</div>
+                <div class="post-category">${escapeHtml(post.category || "Uncategorized")}</div>
               </div>
-              <h3><a href="posts/${post.slug}.html">${post.title}</a></h3>
-              <p class="post-meta">${new Date(post.date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</p>
-              <p class="post-excerpt">${post.excerpt || "Read this post to learn more."}</p>
-              <a href="posts/${post.slug}.html" class="post-link">Read More →</a>
+              <h3><a href="${postUrl}">${escapeHtml(post.title)}</a></h3>
+              <p class="post-meta">${escapeHtml(displayDate)}</p>
+              <p class="post-excerpt">${escapeHtml(post.excerpt || "Read this post to learn more.")}</p>
+              <a href="${postUrl}" class="post-link">Read More →</a>
             </article>
-          `,
-        )
+          `;
+        })
         .join("");
     };
 
@@ -524,6 +552,9 @@
         });
     };
 
+    let postsRequestController;
+    let postsRequestId = 0;
+
     async function loadPosts() {
       const searchTerm = (searchInput?.value || "").trim();
       const query = searchTerm || currentQuery;
@@ -532,17 +563,21 @@
       url.searchParams.set("page", String(currentPage));
       url.searchParams.set("limit", "6");
 
-      if (query) {
-        url.searchParams.set("q", query);
-      }
-      if (category) {
-        url.searchParams.set("category", category);
-      }
+      if (query) url.searchParams.set("q", query);
+      if (category) url.searchParams.set("category", category);
+
+      postsRequestController?.abort();
+      const controller = new AbortController();
+      postsRequestController = controller;
+      const requestId = ++postsRequestId;
+      postsGrid?.setAttribute("aria-busy", "true");
 
       try {
-        const response = await fetch(url);
+        const response = await fetch(url, { signal: controller.signal });
         if (!response.ok) throw new Error("Failed to load posts");
         const result = await response.json();
+        if (requestId !== postsRequestId) return;
+
         currentSearchResults = result.posts || [];
         renderPosts(currentSearchResults);
         renderPagination(
@@ -554,9 +589,14 @@
           },
         );
       } catch (error) {
+        if (error.name === "AbortError" || requestId !== postsRequestId) return;
         if (postsGrid) {
           postsGrid.innerHTML =
             '<div class="no-posts">Unable to load posts right now.</div>';
+        }
+      } finally {
+        if (requestId === postsRequestId) {
+          postsGrid?.setAttribute("aria-busy", "false");
         }
       }
     }
@@ -613,10 +653,12 @@
           const tags = await response.json();
           if (tags.length > 0) {
             tagsContainer.innerHTML = tags
-              .map(
-                (tag) =>
-                  `<a href="#" class="tag" data-tag="${tag.name.toLowerCase()}" title="${tag.count} post${tag.count > 1 ? "s" : ""}">${tag.name}</a>`,
-              )
+              .map((tag) => {
+                const tagName = String(tag.name || "");
+                const tagValue = tagName.toLowerCase();
+                const count = Number(tag.count) || 0;
+                return `<a href="#" class="tag" data-tag="${escapeHtml(tagValue)}" title="${count} post${count > 1 ? "s" : ""}">${escapeHtml(tagName)}</a>`;
+              })
               .join("");
             tagsContainer.querySelectorAll(".tag").forEach((tag) => {
               tag.addEventListener("click", (e) => {

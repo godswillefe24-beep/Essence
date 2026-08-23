@@ -36,23 +36,16 @@
   }
 
   async function buildWidget() {
-    let posts;
+    let related;
     try {
-      const res = await fetch('/api/posts?limit=1000');
-      const data = await res.json();
-      posts = Array.isArray(data) ? data : data.posts || [];
+      const res = await fetch(`/api/posts/${encodeURIComponent(currentSlug)}/related`);
+      if (!res.ok) return;
+      related = await res.json();
     } catch {
       return; // fail silently — related posts are a nice-to-have, not critical
     }
 
-    const currentPost = posts.find((p) => p.slug === currentSlug || p.id === currentId);
-    if (!currentPost || !currentPost.category) return;
-
-    const related = posts
-      .filter((p) => p.slug !== currentSlug && p.category === currentPost.category)
-      .slice(0, 3);
-
-    if (related.length === 0) return;
+    if (!Array.isArray(related) || related.length === 0) return;
 
     const article = document.querySelector('article');
     if (!article) return;

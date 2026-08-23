@@ -8,7 +8,7 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { all, get, run, db } from "./db.js";
+import { all, get, run, transaction, db } from "./db.js";
 import {
   sanitizeString,
   sanitizeEmail,
@@ -44,12 +44,96 @@ function loadEnvFile() {
 loadEnvFile();
 
 // Middleware
-app.use(cors());
-app.use(express.json());
+app.disable("x-powered-by");
+
+const allowedOrigins = (process.env.CORS_ORIGINS || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    credentials: true,
+    origin: allowedOrigins.length
+      ? (origin, callback) => {
+          // Requests without an Origin header are same-origin or server-to-server.
+          if (!origin || allowedOrigins.includes(origin)) {
+            return callback(null, true);
+          }
+          return callback(new Error("Origin is not allowed"));
+        }
+      : false,
+  }),
+);
+
+// Keep uploads and chat requests bounded so malformed clients cannot consume
+// unbounded memory before route-level validation runs.
+app.use(express.json({ limit: "100kb" }));
+
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+
+  // Only advertise HSTS when the request actually arrived over HTTPS. This
+  // avoids breaking local HTTP development while protecting production.
+  if (req.secure || req.get("x-forwarded-proto") === "https") {
+    res.setHeader(
+      "Strict-Transport-Security",
+      "max-age=31536000; includeSubDomains",
+    );
+  }
+  next();
+});
+
+const privateStaticFiles = new Set([
+  "/server.js",
+  "/db.js",
+  "/migrate.js",
+  "/backfill-post-content.js",
+  "/embed-posts.js",
+  "/embeddings.js",
+  "/run-sql-file.js",
+  "/utils.js",
+  "/package.json",
+  "/package-lock.json",
+  "/render.yaml",
+  "/Procfile",
+  "/.htaccess",
+]);
+
+app.use((req, res, next) => {
+  const requestPath = decodeURIComponent(req.path);
+  const lowerPath = requestPath.toLowerCase();
+  const isPrivatePath =
+    lowerPath === "/.env" ||
+    lowerPath.startsWith("/.env.") ||
+    lowerPath.endsWith(".sql") ||
+    lowerPath.endsWith(".md") ||
+    lowerPath.endsWith(".log");
+
+  if (
+    privateStaticFiles.has(lowerPath) ||
+    requestPath.startsWith("/routes/") ||
+    requestPath.startsWith("/data/") ||
+    isPrivatePath
+  ) {
+    return res.status(404).end();
+  }
+  next();
+});
+
 app.use(express.static(__dirname));
 
 import chatRouter from "./routes/chat.js";
 app.use("/api/chat", chatRouter);
+
+// Lightweight liveness endpoint for Render and external monitors. Database
+// readiness remains observable through the application-level API checks.
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", uptime: Math.floor(process.uptime()) });
+});
 
 // ==========================================
 // LOGGING & VALIDATION HELPERS
@@ -67,15 +151,27 @@ function logInfo(context, message) {
 // unit tested without importing this whole file (which connects to Turso
 // and starts the server at import time).
 
-// Strip script tags, iframes, inline event handlers, and javascript: URLs
-// from admin-supplied HTML before writing post files.
+// Defense-in-depth filtering for admin-supplied HTML. This is intentionally
+// conservative until a full allowlist sanitizer is introduced: executable and
+// browser-embedded elements are removed, inline handlers are stripped, and
+// dangerous URL schemes are neutralized.
 function stripDangerousHtml(html) {
   if (typeof html !== "string") return "";
   return html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(
+      /<\s*(?:script|iframe|object|embed|form|input|button|textarea|select|style|link|meta|base|svg|math)(?:\s[^>]*)?>[\s\S]*?<\s*\/\s*(?:script|iframe|object|embed|form|input|button|textarea|select|style|link|meta|base|svg|math)\s*>/gi,
+      "",
+    )
+    .replace(
+      /<\s*\/?\s*(?:script|iframe|object|embed|form|input|button|textarea|select|style|link|meta|base|svg|math)(?:\s[^>]*)?>/gi,
+      "",
+    )
     .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(/javascript:/gi, "");
+    .replace(
+      /\s+(?:href|src|xlink:href|action|formaction|poster)\s*=\s*("|')\s*(?:javascript|vbscript|data):[\s\S]*?\1/gi,
+      "",
+    )
+    .replace(/\s+(?:href|src|xlink:href|action|formaction|poster)\s*=\s*(?:javascript|vbscript|data):[^\s>]+/gi, "");
 }
 
 function sanitizePostContent(content) {
@@ -132,6 +228,14 @@ const adminLoginLimiter = rateLimit({
   message: { error: "Too many login attempts, please wait before trying again" },
 });
 
+const userAuthLimiter = rateLimit({
+  windowMs: 900000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many authentication attempts, please try again later" },
+});
+
 app.use(globalLimiter);
 
 // ==========================================
@@ -149,6 +253,66 @@ if (!JWT_SECRET) {
       "and set it in your environment — without this, every server restart " +
       "invalidates all existing logins.",
   );
+}
+
+const USER_AUTH_COOKIE = "essence_user_auth";
+const ADMIN_AUTH_COOKIE = "essence_admin_auth";
+const AUTH_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+
+function parseCookies(header = "") {
+  return header.split(";").reduce((cookies, pair) => {
+    const separator = pair.indexOf("=");
+    if (separator < 0) return cookies;
+    const key = pair.slice(0, separator).trim();
+    const value = pair.slice(separator + 1).trim();
+    if (!key) return cookies;
+    try {
+      cookies[key] = decodeURIComponent(value);
+    } catch {
+      cookies[key] = value;
+    }
+    return cookies;
+  }, {});
+}
+
+function getAuthToken(req, cookieName = USER_AUTH_COOKIE) {
+  const authHeader = req.headers.authorization || "";
+  if (authHeader.startsWith("Bearer ")) return authHeader.slice(7);
+  return parseCookies(req.headers.cookie)[cookieName] || null;
+}
+
+function setAuthCookie(req, res, token, cookieName = USER_AUTH_COOKIE) {
+  const secure =
+    process.env.NODE_ENV === "production" ||
+    req.secure ||
+    req.get("x-forwarded-proto") === "https";
+  const attributes = [
+    `${cookieName}=${encodeURIComponent(token)}`,
+    `Max-Age=${AUTH_MAX_AGE_SECONDS}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Strict",
+  ];
+  if (secure) attributes.push("Secure");
+  res.setHeader("Cache-Control", "no-store");
+  res.append("Set-Cookie", attributes.join("; "));
+}
+
+function clearAuthCookie(req, res, cookieName = USER_AUTH_COOKIE) {
+  const secure =
+    process.env.NODE_ENV === "production" ||
+    req.secure ||
+    req.get("x-forwarded-proto") === "https";
+  const attributes = [
+    `${cookieName}=`,
+    "Max-Age=0",
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Strict",
+  ];
+  if (secure) attributes.push("Secure");
+  res.setHeader("Cache-Control", "no-store");
+  res.append("Set-Cookie", attributes.join("; "));
 }
 
 // Email configuration (using test credentials - configure with real service)
@@ -288,8 +452,8 @@ app.post("/api/comments", commentLimiter, async (req, res) => {
       }
     }
 
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.split(" ")[1];
+    const token = getAuthToken(req);
+
 
     let userId = null;
     let userName = sanitizedName;
@@ -553,6 +717,28 @@ app.get("/api/posts/:idOrSlug", async (req, res) => {
   } catch (error) {
     logError("Get single post", error);
     res.status(500).json({ error: "Failed to fetch post" });
+  }
+});
+
+// Public: fetch a small related-post set without transferring the full catalog.
+app.get("/api/posts/:idOrSlug/related", async (req, res) => {
+  try {
+    const current = await get(
+      "SELECT id, category FROM posts WHERE id = ? OR slug = ?",
+      [req.params.idOrSlug, req.params.idOrSlug],
+    );
+    if (!current || !current.category) return res.json([]);
+
+    const related = await all(
+      `SELECT ${POST_PREVIEW_COLUMNS} FROM posts
+       WHERE LOWER(category) = LOWER(?) AND id <> ?
+       ORDER BY date DESC LIMIT 3`,
+      [current.category, current.id],
+    );
+    res.json(related);
+  } catch (error) {
+    logError("Related posts", error);
+    res.status(500).json({ error: "Failed to fetch related posts" });
   }
 });
 
@@ -1084,28 +1270,27 @@ app.post("/api/subscribe", subscribeLimiter, async (req, res) => {
 // USER AUTHENTICATION
 // ==========================================
 
-app.post("/api/auth/register", async (req, res) => {
+app.post("/api/auth/register", userAuthLimiter, async (req, res) => {
   try {
     const { username, email, password, confirmPassword } = req.body;
+    const sanitizedUsername = sanitizeString(username).slice(0, 50);
+    const sanitizedEmail = sanitizeEmail(email);
 
-    if (!username || !email || !password || !confirmPassword) {
+    if (!sanitizedUsername || !sanitizedEmail || !password || !confirmPassword) {
       return res.status(400).json({ error: "All fields are required" });
     }
     if (password !== confirmPassword) {
       return res.status(400).json({ error: "Passwords do not match" });
     }
-    if (password.length < 6) {
+    if (password.length < 8) {
       return res
         .status(400)
-        .json({ error: "Password must be at least 6 characters" });
-    }
-    if (!email.includes("@")) {
-      return res.status(400).json({ error: "Invalid email address" });
+        .json({ error: "Password must be at least 8 characters" });
     }
 
     const existing = await get(
       "SELECT id FROM users WHERE email = ? OR username = ?",
-      [email, username],
+      [sanitizedEmail, sanitizedUsername],
     );
     if (existing) {
       return res.status(400).json({ error: "User already exists" });
@@ -1115,8 +1300,8 @@ app.post("/api/auth/register", async (req, res) => {
 
     const newUser = {
       id: crypto.randomUUID(),
-      username,
-      email,
+      username: sanitizedUsername,
+      email: sanitizedEmail,
       password: hashedPassword,
       createdAt: new Date().toISOString(),
       bio: "",
@@ -1146,10 +1331,10 @@ app.post("/api/auth/register", async (req, res) => {
       JWT_SECRET,
       { expiresIn: "30d" },
     );
+    setAuthCookie(req, res, token);
 
     res.status(201).json({
       success: true,
-      token,
       user: {
         id: newUser.id,
         username: newUser.username,
@@ -1165,15 +1350,16 @@ app.post("/api/auth/register", async (req, res) => {
   }
 });
 
-app.post("/api/auth/login", async (req, res) => {
+app.post("/api/auth/login", userAuthLimiter, async (req, res) => {
   try {
     const { email, password } = req.body;
+    const sanitizedEmail = sanitizeEmail(email);
 
-    if (!email || !password) {
+    if (!sanitizedEmail || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
-    const row = await get("SELECT * FROM users WHERE email = ?", [email]);
+    const row = await get("SELECT * FROM users WHERE email = ?", [sanitizedEmail]);
     if (!row) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
@@ -1189,10 +1375,10 @@ app.post("/api/auth/login", async (req, res) => {
       JWT_SECRET,
       { expiresIn: "30d" },
     );
+    setAuthCookie(req, res, token);
 
     res.json({
       success: true,
-      token,
       user: {
         id: user.id,
         username: user.username,
@@ -1210,10 +1396,20 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
+app.post("/api/auth/logout", (req, res) => {
+  clearAuthCookie(req, res, USER_AUTH_COOKIE);
+  res.json({ success: true });
+});
+
+app.post("/api/admin/logout", (req, res) => {
+  clearAuthCookie(req, res, ADMIN_AUTH_COOKIE);
+  res.json({ success: true });
+});
+
 app.post("/api/auth/validate", async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.split(" ")[1];
+    const token = getAuthToken(req);
+
 
     if (!token) {
       return res.status(401).json({ error: "No token provided" });
@@ -1271,8 +1467,8 @@ app.get("/api/users/:username", async (req, res) => {
 
 app.put("/api/users/profile/:id", async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader?.split(" ")[1];
+    const token = getAuthToken(req);
+
 
     if (!token) {
       return res.status(401).json({ error: "No token provided" });
@@ -1337,7 +1533,8 @@ app.post("/api/admin/login", adminLoginLimiter, async (req, res) => {
     }
 
     const token = jwt.sign({ role: "admin" }, JWT_SECRET, { expiresIn: "12h" });
-    res.json({ token });
+    setAuthCookie(req, res, token, ADMIN_AUTH_COOKIE);
+    res.json({ success: true });
   } catch (err) {
     logError("Admin login", err);
     res.status(500).json({ error: "Login failed" });
@@ -1345,8 +1542,7 @@ app.post("/api/admin/login", adminLoginLimiter, async (req, res) => {
 });
 
 function verifyAdmin(req, res, next) {
-  const authHeader = req.headers.authorization;
-  const token = authHeader?.split(" ")[1];
+  const token = getAuthToken(req, ADMIN_AUTH_COOKIE);
 
   if (!token) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -1400,12 +1596,20 @@ app.delete("/api/admin/subscribers/:id", verifyAdmin, async (req, res) => {
   }
 });
 
+function escapeCsvCell(value) {
+  const text = String(value ?? "");
+  // Spreadsheet applications may evaluate cells beginning with these
+  // characters as formulas. Prefix them with an apostrophe before quoting.
+  const safeText = /^[=+\-@]/.test(text.trim()) ? `'${text}` : text;
+  return `"${safeText.replace(/"/g, '""')}"`;
+}
+
 app.get("/api/admin/subscribers/export", verifyAdmin, async (req, res) => {
   try {
     const subscribers = await readSubscribers();
-    const rows = ["email,date"];
+    const rows = [["email", "date"].map(escapeCsvCell).join(",")];
     subscribers.forEach((s) => {
-      rows.push(`${String(s.email).replace(/,/g, "")},${s.date}`);
+      rows.push([s.email, s.date].map(escapeCsvCell).join(","));
     });
 
     const csv = rows.join("\n");
@@ -1532,35 +1736,107 @@ app.get("/rss.xml", (req, res) => {
 
 // ==========================================
 // ANALYTICS & STATS ENDPOINTS
-// (in-memory session/event tracking — was already ephemeral by design
-// before this migration, not part of persistent storage, left unchanged)
+// Events and sessions are persisted in the database; no raw IP addresses are stored.
 // ==========================================
 
-const analyticsStore = {
-  pageViews: [],
-  events: [],
-  sessions: new Map(),
-};
+const MAX_ANALYTICS_ITEMS = 50;
+const MAX_ANALYTICS_TEXT = 500;
+const MAX_ANALYTICS_METADATA = 2000;
 
-app.post("/api/analytics", (req, res) => {
+function normalizeAnalyticsSessionId(value) {
+  const sessionId = String(value || "").trim();
+  return /^[A-Za-z0-9_-]{8,128}$/.test(sessionId) ? sessionId : null;
+}
+
+function normalizeAnalyticsPage(value) {
+  const page = String(value || "").trim();
+  return page ? page.slice(0, MAX_ANALYTICS_TEXT) : null;
+}
+
+function normalizeAnalyticsMetadata(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   try {
-    const { sessionId, pageViews, events } = req.body;
+    return JSON.stringify(value).slice(0, MAX_ANALYTICS_METADATA);
+  } catch {
+    return null;
+  }
+}
 
-    if (pageViews) {
-      analyticsStore.pageViews.push(...pageViews);
+function normalizeAnalyticsDuration(value) {
+  const duration = Number(value);
+  return Number.isFinite(duration)
+    ? Math.max(0, Math.min(Math.round(duration), 86400000))
+    : null;
+}
+
+app.post("/api/analytics", async (req, res) => {
+  try {
+    const sessionId = normalizeAnalyticsSessionId(req.body?.sessionId);
+    if (!sessionId) {
+      return res.status(400).json({ error: "Invalid analytics session" });
     }
-    if (events) {
-      analyticsStore.events.push(...events);
-    }
-    if (sessionId) {
-      analyticsStore.sessions.set(sessionId, {
-        createdAt: new Date().toISOString(),
-        pageCount: pageViews?.length || 0,
-        eventCount: events?.length || 0,
+
+    const pageViews = Array.isArray(req.body?.pageViews)
+      ? req.body.pageViews.slice(0, MAX_ANALYTICS_ITEMS)
+      : [];
+    const events = Array.isArray(req.body?.events)
+      ? req.body.events.slice(0, MAX_ANALYTICS_ITEMS)
+      : [];
+    const now = new Date().toISOString();
+    const statements = [];
+
+    pageViews.forEach((view) => {
+      if (!view || typeof view !== "object") return;
+      const page = normalizeAnalyticsPage(view.page);
+      if (!page) return;
+      statements.push({
+        sql: `INSERT INTO analytics_events
+          (session_id, event_type, name, page, duration_ms, metadata_json, created_at)
+          VALUES (?, 'page_view', 'page_view', ?, ?, NULL, ?)`,
+        args: [sessionId, page, normalizeAnalyticsDuration(view.duration), now],
       });
-    }
+    });
 
-    res.json({ success: true, message: "Analytics recorded" });
+    events.forEach((event) => {
+      if (!event || typeof event !== "object") return;
+      const name = String(event.name || "").trim().slice(0, 100);
+      if (!/^[A-Za-z0-9_.:%-]{1,100}$/.test(name)) return;
+      const page = normalizeAnalyticsPage(event.data?.page || event.page);
+      statements.push({
+        sql: `INSERT INTO analytics_events
+          (session_id, event_type, name, page, duration_ms, metadata_json, created_at)
+          VALUES (?, 'event', ?, ?, ?, ?, ?)`,
+        args: [
+          sessionId,
+          name,
+          page,
+          normalizeAnalyticsDuration(event.data?.duration || event.duration),
+          normalizeAnalyticsMetadata(event.data || event.data_json),
+          now,
+        ],
+      });
+    });
+
+    const pageViewCount = pageViews.filter(
+      (view) => view && typeof view === "object" && normalizeAnalyticsPage(view.page),
+    ).length;
+    const eventCount = statements.length - pageViewCount;
+    statements.unshift({
+      sql: `INSERT INTO analytics_sessions
+        (session_id, first_seen_at, last_seen_at, page_count, event_count)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(session_id) DO UPDATE SET
+          last_seen_at = excluded.last_seen_at,
+          page_count = analytics_sessions.page_count + excluded.page_count,
+          event_count = analytics_sessions.event_count + excluded.event_count`,
+      args: [sessionId, now, now, pageViewCount, eventCount],
+    });
+
+    await transaction(statements);
+    res.json({
+      success: true,
+      accepted: { pageViews: pageViewCount, events: eventCount },
+    });
   } catch (error) {
     logError("Analytics", error);
     res.status(500).json({ error: "Failed to record analytics" });
@@ -1569,12 +1845,15 @@ app.post("/api/analytics", (req, res) => {
 
 app.get("/api/admin/stats", verifyAdmin, async (req, res) => {
   try {
+    const activeSince = new Date(Date.now() - 30 * 60 * 1000).toISOString();
     const [
       posts,
       comments,
       subscribers,
       viewSumRow,
+      likeSumRow,
       pageViewTrend,
+      activeSessionsRow,
       topViewRows,
       topLikeRows,
     ] = await Promise.all([
@@ -1582,7 +1861,12 @@ app.get("/api/admin/stats", verifyAdmin, async (req, res) => {
       readComments(),
       readSubscribers(),
       get("SELECT COALESCE(SUM(views), 0) AS total FROM post_views"),
+      get("SELECT COALESCE(SUM(likes), 0) AS total FROM post_likes"),
       getPageViewTrend(),
+      get(
+        "SELECT COUNT(*) AS count FROM analytics_sessions WHERE last_seen_at >= ?",
+        [activeSince],
+      ),
       all("SELECT post_id, views FROM post_views ORDER BY views DESC LIMIT 5"),
       all("SELECT post_id, likes FROM post_likes ORDER BY likes DESC LIMIT 5"),
     ]);
@@ -1613,7 +1897,8 @@ app.get("/api/admin/stats", verifyAdmin, async (req, res) => {
       totalComments: comments.length,
       totalSubscribers: subscribers.length,
       totalViews: viewSumRow ? viewSumRow.total : 0,
-      activeSessions: analyticsStore.sessions.size,
+      totalLikes: likeSumRow ? likeSumRow.total : 0,
+      activeSessions: activeSessionsRow?.count || 0,
       recentPosts: posts.slice(0, 5),
       recentComments: comments.slice(0, 5),
       topCategories: getTopCategories(posts),
@@ -1629,28 +1914,49 @@ app.get("/api/admin/stats", verifyAdmin, async (req, res) => {
   }
 });
 
-app.get("/api/admin/analytics", verifyAdmin, (req, res) => {
+app.get("/api/admin/analytics", verifyAdmin, async (req, res) => {
   try {
-    const pageViewsByPage = {};
-    analyticsStore.pageViews.forEach((view) => {
-      pageViewsByPage[view.page] = (pageViewsByPage[view.page] || 0) + 1;
-    });
+    const activeSince = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    const [pageRows, eventRows, totals, activeSessionsRow] = await Promise.all([
+      all(`SELECT COALESCE(page, '(unknown)') AS page, COUNT(*) AS count
+           FROM analytics_events
+           WHERE event_type = 'page_view'
+           GROUP BY page
+           ORDER BY count DESC
+           LIMIT 100`),
+      all(`SELECT name, COUNT(*) AS count
+           FROM analytics_events
+           WHERE event_type = 'event'
+           GROUP BY name
+           ORDER BY count DESC
+           LIMIT 100`),
+      get(`SELECT
+             SUM(CASE WHEN event_type = 'page_view' THEN 1 ELSE 0 END) AS page_views,
+             SUM(CASE WHEN event_type = 'event' THEN 1 ELSE 0 END) AS events
+           FROM analytics_events`),
+      get(
+        "SELECT COUNT(*) AS count FROM analytics_sessions WHERE last_seen_at >= ?",
+        [activeSince],
+      ),
+    ]);
 
-    const eventsByType = {};
-    analyticsStore.events.forEach((event) => {
-      eventsByType[event.name] = (eventsByType[event.name] || 0) + 1;
-    });
+    const pageViewsByPage = Object.fromEntries(
+      pageRows.map((row) => [row.page, Number(row.count) || 0]),
+    );
+    const eventsByType = Object.fromEntries(
+      eventRows.map((row) => [row.name, Number(row.count) || 0]),
+    );
 
     res.json({
-      pageViews: analyticsStore.pageViews.length,
+      pageViews: Number(totals?.page_views) || 0,
       pageViewsByPage,
-      events: analyticsStore.events.length,
+      events: Number(totals?.events) || 0,
       eventsByType,
-      activeSessions: analyticsStore.sessions.size,
-      topPages: Object.entries(pageViewsByPage)
-        .map(([page, count]) => ({ page, count }))
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 10),
+      activeSessions: Number(activeSessionsRow?.count) || 0,
+      topPages: pageRows.map((row) => ({
+        page: row.page,
+        count: Number(row.count) || 0,
+      })),
     });
   } catch (error) {
     logError("Admin analytics", error);
@@ -1673,13 +1979,15 @@ function getTopCategories(posts) {
 }
 
 async function getPageViewTrend() {
-  const row = await get(
-    "SELECT COALESCE(SUM(views), 0) AS total FROM post_views",
-  );
-  const total = row ? row.total : 0;
-  const today = new Date().toISOString().split("T")[0];
-  // Per-post view counts are cumulative (no daily breakdown stored yet).
-  return [{ date: today, views: total }];
+  const rows = await all(`SELECT substr(created_at, 1, 10) AS date, COUNT(*) AS views
+                          FROM analytics_events
+                          WHERE event_type = 'page_view'
+                          GROUP BY substr(created_at, 1, 10)
+                          ORDER BY date DESC
+                          LIMIT 30`);
+  return rows
+    .map((row) => ({ date: row.date, views: Number(row.views) || 0 }))
+    .reverse();
 }
 
 app.listen(PORT, HOST, () => {

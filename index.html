@@ -196,7 +196,7 @@
           <a href="posts/post2.html" aria-label="Read full article: Welcome to my blog">Read Full Article →</a>
         </div>
         <div class="featured-visual">
-          <img src="uploads/Latest_Technology_News_and_Innovations.jpg" loading="lazy" alt="Blog preview"
+          <img src="uploads/Latest_Technology_News_and_Innovations.jpg" loading="eager" fetchpriority="high" decoding="async" alt="Blog preview"
             class="featured-image" />
         </div>
       </article>
@@ -209,8 +209,8 @@
 
         <div class="comment-form">
           <h4>Leave a Comment</h4>
-          <input type="text" class="comment-name" placeholder="Your name..." />
-          <textarea class="comment-text" placeholder="Share your thoughts..." rows="4"></textarea>
+          <input type="text" class="comment-name" placeholder="Your name..." aria-label="Your name" autocomplete="name" />
+          <textarea class="comment-text" placeholder="Share your thoughts..." aria-label="Your comment" rows="4"></textarea>
           <button class="comment-submit">Post Comment</button>
         </div>
       </section>
@@ -238,8 +238,12 @@
           <button class="filter-btn" data-filter="Education" aria-pressed="false">Education</button>
           <button class="filter-btn" data-filter="Business" aria-pressed="false">Business</button>
         </div>
-        <div class="posts-grid" id="posts-grid"></div>
-        <div class="posts-pagination" id="posts-pagination"></div>
+        <div class="posts-grid" id="posts-grid" aria-live="polite" aria-busy="true">
+          <div class="post-skeleton" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div class="post-skeleton" aria-hidden="true"><span></span><span></span><span></span></div>
+          <div class="post-skeleton" aria-hidden="true"><span></span><span></span><span></span></div>
+        </div>
+        <div class="posts-pagination" id="posts-pagination" aria-live="polite"></div>
       </section>
 
       <!-- Sidebar -->
@@ -268,7 +272,7 @@
 
         <div class="sidebar-widget">
           <h3>✉️ Subscribe</h3>
-          <input type="email" placeholder="Your email" class="email-input" />
+          <input type="email" placeholder="Your email" aria-label="Email address" autocomplete="email" class="email-input" />
           <button class="subscribe-btn">Subscribe</button>
         </div>
       </aside>
@@ -310,8 +314,8 @@
     </div>
   </footer>
 </body>
-<script src="script.js" defer></script>
-<script src="enhancements.js" defer></script>
-<script src="public/js/chat-widget.js"></script>
+  <script src="script.js" defer></script>
+  <script src="enhancements.js" defer></script>
+  <script src="public/js/chat-widget.js" defer></script>
 
 </html>

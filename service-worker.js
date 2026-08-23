@@ -1,9 +1,10 @@
-const CACHE_NAME = 'essence-v3';
+const CACHE_NAME = 'essence-v4';
 const urlsToCache = [
   '/',
   '/index.html',
   '/styles.css',
   '/script.js',
+  '/enhancements.js',
   '/manifest.json',
   '/posts/post1.html',
   '/posts/post2.html',
@@ -24,97 +25,69 @@ const urlsToCache = [
   '/posts/post17.html'
 ];
 
-// Install event - cache files
-self.addEventListener('install', event => {
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(urlsToCache);
-    })
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
   );
   self.skipWaiting();
 });
 
-// Activate event - clean up old caches
-self.addEventListener('activate', event => {
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then(cacheNames => {
-      return Promise.all(
-        cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches.keys().then((cacheNames) => Promise.all(
+      cacheNames
+        .filter((cacheName) => cacheName !== CACHE_NAME)
+        .map((cacheName) => caches.delete(cacheName))
+    ))
   );
   self.clients.claim();
 });
 
-// Fetch event - serve from cache, fallback to network
-self.addEventListener('fetch', event => {
-  // Skip non-HTTP(S) requests (e.g., chrome-extension://, blob:, etc.)
-  if (!event.request.url.startsWith('http://') && !event.request.url.startsWith('https://')) {
-    return;
-  }
-
-  // Skip API calls - always try network first
-  if (event.request.url.includes('/api/')) {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => response)
-        .catch(() => caches.match(event.request))
-    );
-    return;
-  }
-
-  // For other requests, try cache first, then network
-  event.respondWith(
-    caches.match(event.request).then(response => {
-      return response || fetch(event.request)
-        .then(response => {
-          // Only cache successful responses with valid types
-          if (!response || response.status !== 200 || response.type === 'error' || response.type === 'opaque') {
-            return response;
-          }
-          
-          // Skip caching certain content types
-          const contentType = response.headers.get('content-type') || '';
-          if (contentType.includes('chrome-extension') || response.url.includes('chrome-extension')) {
-            return response;
-          }
-
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            try {
-              cache.put(event.request, responseToCache);
-            } catch (error) {
-              // Silently ignore caching errors
-              console.debug('Cache write error:', error);
-            }
-          });
-          return response;
-        })
-        .catch(() => {
-          // Return offline page if available
-          return caches.match(event.request);
-        });
-    })
-  );
-});
-
-// Background sync for offline actions (future feature)
-self.addEventListener('sync', event => {
-  if (event.tag === 'sync-comments') {
-    event.waitUntil(syncComments());
-  }
-  
-});
-
-async function syncComments() {
+async function networkFirst(request) {
   try {
-    // Sync pending comments when connection restored
-    console.log('Syncing comments...');
-  } catch (error) {
-    console.log('Sync failed:', error);
+    const response = await fetch(request);
+    if (response.ok && response.type !== 'opaque') {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    return (await caches.match(request)) || caches.match('/index.html');
   }
 }
+
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(request);
+    if (response.ok && response.type !== 'opaque') {
+      const cache = await caches.open(CACHE_NAME);
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch {
+    return caches.match('/index.html');
+  }
+}
+
+self.addEventListener('fetch', (event) => {
+  if (!['http:', 'https:'].includes(new URL(event.request.url).protocol)) return;
+
+  // API responses should be fresh, but still remain usable offline when a
+  // previous response is available.
+  if (new URL(event.request.url).pathname.startsWith('/api/')) {
+    event.respondWith(networkFirst(event.request));
+    return;
+  }
+
+  // Navigation responses are network-first so deployments are not hidden by
+  // an indefinitely stale cached HTML page.
+  if (event.request.mode === 'navigate' || event.request.destination === 'document') {
+    event.respondWith(networkFirst(event.request));
+    return;
+  }
+
+  event.respondWith(cacheFirst(event.request));
+});

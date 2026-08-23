@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS posts (
     category TEXT,
     date TEXT NOT NULL,
     excerpt TEXT,
+    content TEXT,
     updated_at TEXT
 );
 
@@ -17,10 +18,12 @@ CREATE TABLE IF NOT EXISTS comments (
     user_id TEXT,
     name TEXT NOT NULL,
     text TEXT NOT NULL,
-    timestamp TEXT NOT NULL
+    timestamp TEXT NOT NULL,
+    parent_id TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments (post_id);
+CREATE INDEX IF NOT EXISTS idx_comments_parent_id ON comments (parent_id);
 
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
@@ -65,3 +68,33 @@ CREATE TABLE IF NOT EXISTS site_stats (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     total_likes INTEGER NOT NULL DEFAULT 0
 );
+
+-- Durable, privacy-minimized analytics. No raw IP addresses are stored.
+CREATE TABLE IF NOT EXISTS analytics_sessions (
+    session_id TEXT PRIMARY KEY,
+    first_seen_at TEXT NOT NULL,
+    last_seen_at TEXT NOT NULL,
+    page_count INTEGER NOT NULL DEFAULT 0,
+    event_count INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS analytics_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id TEXT NOT NULL,
+    event_type TEXT NOT NULL CHECK (event_type IN ('page_view', 'event')),
+    name TEXT NOT NULL,
+    page TEXT,
+    post_id TEXT,
+    duration_ms INTEGER,
+    metadata_json TEXT,
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_analytics_events_created_at
+    ON analytics_events (created_at);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_type_name
+    ON analytics_events (event_type, name);
+CREATE INDEX IF NOT EXISTS idx_analytics_events_page
+    ON analytics_events (page);
+CREATE INDEX IF NOT EXISTS idx_analytics_sessions_last_seen_at
+    ON analytics_sessions (last_seen_at);

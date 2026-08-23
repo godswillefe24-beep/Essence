@@ -2,7 +2,57 @@ const API = `${window.location.origin}/api`;
 const PASSWORD = "";
 
 let isLoggedIn = false;
-let adminToken = null;
+// The admin session is held in an HttpOnly cookie; no JWT is exposed to JS.
+
+function adminFetch(url, options = {}) {
+  return fetch(url, { ...options, credentials: "include" });
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (character) => {
+    const entities = {
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    };
+    return entities[character];
+  });
+}
+
+function renderTopPosts(containerId, posts, metric) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  container.replaceChildren();
+  if (!Array.isArray(posts) || posts.length === 0) {
+    const empty = document.createElement("p");
+    empty.textContent = "No data yet";
+    empty.style.opacity = "0.7";
+    container.appendChild(empty);
+    return;
+  }
+
+  posts.forEach((post) => {
+    const item = document.createElement("div");
+    item.className = "item";
+
+    const info = document.createElement("div");
+    info.className = "item-info";
+
+    const title = document.createElement("h3");
+    title.textContent = post.title || `Post ${post.postId}`;
+    info.appendChild(title);
+
+    const count = document.createElement("p");
+    count.textContent = `${Number(post[metric]) || 0} ${metric}`;
+    info.appendChild(count);
+
+    item.appendChild(info);
+    container.appendChild(item);
+  });
+}
 
 // DOM Elements - will be initialized after DOM loads
 let loginContainer;
@@ -75,7 +125,7 @@ async function handleLogin(e) {
   e.preventDefault();
 
   try {
-    const response = await fetch(`${API}/admin/login`, {
+    const response = await adminFetch(`${API}/admin/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ password: passwordInput.value }),
@@ -83,7 +133,7 @@ async function handleLogin(e) {
 
     if (response.ok) {
       const data = await response.json();
-      adminToken = data.token;
+
       isLoggedIn = true;
       loginContainer.classList.add("hidden");
       dashboard.classList.remove("hidden");
@@ -100,7 +150,8 @@ async function handleLogin(e) {
 
 function handleLogout() {
   isLoggedIn = false;
-  adminToken = null;
+  adminFetch(`${API}/admin/logout`, { method: "POST" }).catch(() => {});
+
   loginContainer.classList.remove("hidden");
   dashboard.classList.add("hidden");
   passwordInput.value = "";
@@ -129,11 +180,11 @@ async function handlePostSubmit(e) {
       ? `${API}/admin/posts/${editPostId}`
       : `${API}/admin/posts`;
 
-    const response = await fetch(endpoint, {
+    const response = await adminFetch(endpoint, {
       method: method,
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${adminToken}`,
+        
       },
       body: JSON.stringify({
         // id is only meaningful on edit (identifies which post to update).
@@ -182,11 +233,11 @@ async function handleSaveSettings() {
   }
 
   try {
-    const response = await fetch(`${API}/admin/settings`, {
+    const response = await adminFetch(`${API}/admin/settings`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${adminToken}`,
+        
       },
       body: JSON.stringify({
         title: blogTitle,
@@ -224,39 +275,43 @@ function showSection(sectionName) {
 
 async function loadDashboardData() {
   try {
-    const response = await fetch(`${API}/analytics`);
-    if (response.ok) {
-      const data = await response.json();
-      document.getElementById("stat-posts").textContent = data.totalPosts || 0;
-      document.getElementById("stat-comments").textContent =
-        data.totalComments || 0;
-      document.getElementById("stat-likes").textContent = data.totalLikes || 0;
-      document.getElementById("stat-subscribers").textContent =
-        data.totalSubscribers || 0;
-    }
-    // Load current settings to prefill form
-    try {
-      const sres = await fetch(`${API}/admin/settings`, {
-        headers: { Authorization: `Bearer ${adminToken}` },
-      });
-      if (sres.ok) {
-        const settings = await sres.json();
-        if (settings.title)
-          document.getElementById("blog-title").value = settings.title;
-        if (settings.description)
-          document.getElementById("blog-description").value =
-            settings.description;
-      }
-    } catch (se) {
-      // ignore
-    }
+    const response = await adminFetch(`${API}/admin/stats`, {
+
+    });
+    if (!response.ok) throw new Error(`Stats request failed (${response.status})`);
+
+    const data = await response.json();
+    document.getElementById("stat-posts").textContent = data.totalPosts || 0;
+    document.getElementById("stat-comments").textContent = data.totalComments || 0;
+    document.getElementById("stat-likes").textContent = data.totalLikes || 0;
+    document.getElementById("stat-subscribers").textContent =
+      data.totalSubscribers || 0;
+    renderTopPosts("top-views-list", data.topPostsByViews, "views");
+    renderTopPosts("top-likes-list", data.topPostsByLikes, "likes");
   } catch (e) {
-    console.log("Could not load analytics:", e.message);
-    // Set defaults
+    console.log("Could not load dashboard stats:", e.message);
     document.getElementById("stat-posts").textContent = 0;
     document.getElementById("stat-comments").textContent = 0;
     document.getElementById("stat-likes").textContent = 0;
     document.getElementById("stat-subscribers").textContent = 0;
+    renderTopPosts("top-views-list", [], "views");
+    renderTopPosts("top-likes-list", [], "likes");
+  }
+
+  // Load current settings to prefill form.
+  try {
+    const sres = await adminFetch(`${API}/admin/settings`, {
+
+    });
+    if (sres.ok) {
+      const settings = await sres.json();
+      if (settings.title) document.getElementById("blog-title").value = settings.title;
+      if (settings.description) {
+        document.getElementById("blog-description").value = settings.description;
+      }
+    }
+  } catch (e) {
+    console.log("Could not load settings:", e.message);
   }
 }
 
@@ -272,12 +327,12 @@ async function loadPosts() {
           (post) => `
         <div class="item">
           <div class="item-info">
-            <h3>${post.title}</h3>
-            <p>${post.category} • ${new Date(post.date || Date.now()).toLocaleDateString()}</p>
+            <h3>${escapeHtml(post.title)}</h3>
+            <p>${escapeHtml(post.category)} • ${escapeHtml(new Date(post.date || Date.now()).toLocaleDateString())}</p>
           </div>
           <div class="item-actions">
-            <button class="btn btn-sm" onclick="editPost('${post.id}')">Edit</button>
-            <button class="btn btn-sm btn-secondary" onclick="deletePost('${post.id}')">Delete</button>
+            <button class="btn btn-sm" onclick="editPost('${escapeHtml(post.id)}')">Edit</button>
+            <button class="btn btn-sm btn-secondary" onclick="deletePost('${escapeHtml(post.id)}')">Delete</button>
           </div>
         </div>
       `,
@@ -292,25 +347,23 @@ async function loadPosts() {
 
 async function editPost(postId) {
   try {
-    const response = await fetch(`${API}/posts?limit=1000`);
-    if (response.ok) {
-      const data = await response.json();
-      const posts = Array.isArray(data) ? data : data.posts || [];
-      const post = posts.find((p) => p.id === postId);
-      if (post) {
-        const postModal = document.getElementById("post-modal");
-        document.getElementById("modal-title").textContent = "Edit Post";
-        document.getElementById("edit-post-id").value = post.id;
-        document.getElementById("post-title").value = post.title;
-        document.getElementById("post-content").value =
-          post.content || post.excerpt || "";
-        document.getElementById("post-category").value = post.category;
-        postModal.classList.remove("hidden");
-      }
-    }
+    // The list endpoint intentionally returns preview fields only. Fetch the
+    // full record so opening an existing post never replaces its body with the
+    // 160-character excerpt on the next save.
+    const response = await fetch(`${API}/posts/${encodeURIComponent(postId)}`);
+    if (!response.ok) throw new Error(`Post request failed (${response.status})`);
+
+    const post = await response.json();
+    const postModal = document.getElementById("post-modal");
+    document.getElementById("modal-title").textContent = "Edit Post";
+    document.getElementById("edit-post-id").value = post.id;
+    document.getElementById("post-title").value = post.title || "";
+    document.getElementById("post-content").value = post.content || post.excerpt || "";
+    document.getElementById("post-category").value = post.category || "";
+    postModal.classList.remove("hidden");
   } catch (error) {
     console.error("Error loading post:", error);
-    alert("Error loading post");
+    alert("Error loading post: " + error.message);
   }
 }
 
@@ -318,9 +371,9 @@ async function deletePost(postId) {
   if (!confirm("Are you sure you want to delete this post?")) return;
 
   try {
-    const response = await fetch(`${API}/admin/posts/${postId}`, {
+    const response = await adminFetch(`${API}/admin/posts/${postId}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${adminToken}` },
+
     });
 
     if (response.ok) {
@@ -337,8 +390,8 @@ async function deletePost(postId) {
 
 async function loadComments() {
   try {
-    const response = await fetch(`${API}/admin/comments`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
+    const response = await adminFetch(`${API}/admin/comments`, {
+
     });
     if (response.ok) {
       const comments = await response.json();
@@ -348,12 +401,12 @@ async function loadComments() {
           (comment) => `
         <div class="item">
           <div class="item-info">
-            <h3>${comment.name}</h3>
-            <p>${comment.text.substring(0, 100)}...</p>
-            <p style="font-size: 0.8rem; margin-top: 5px;">${new Date(comment.timestamp).toLocaleDateString()}</p>
+            <h3>${escapeHtml(comment.name)}</h3>
+            <p>${escapeHtml(String(comment.text || "").substring(0, 100))}...</p>
+            <p style="font-size: 0.8rem; margin-top: 5px;">${escapeHtml(new Date(comment.timestamp).toLocaleDateString())}</p>
           </div>
           <div class="item-actions">
-            <button class="btn btn-sm btn-secondary" onclick="deleteComment('${comment.id}')">Delete</button>
+            <button class="btn btn-sm btn-secondary" onclick="deleteComment('${escapeHtml(comment.id)}')">Delete</button>
           </div>
         </div>
       `,
@@ -371,9 +424,9 @@ async function deleteComment(commentId) {
   if (!confirm("Are you sure you want to delete this comment?")) return;
 
   try {
-    const response = await fetch(`${API}/admin/comments/${commentId}`, {
+    const response = await adminFetch(`${API}/admin/comments/${commentId}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${adminToken}` },
+
     });
 
     if (response.ok) {
@@ -390,8 +443,8 @@ async function deleteComment(commentId) {
 
 async function loadSubscribers() {
   try {
-    const response = await fetch(`${API}/admin/subscribers`, {
-      headers: { Authorization: `Bearer ${adminToken}` },
+    const response = await adminFetch(`${API}/admin/subscribers`, {
+
     });
     if (response.ok) {
       const data = await response.json();
@@ -409,11 +462,11 @@ async function loadSubscribers() {
           (sub) => `
         <div class="item">
           <div class="item-info">
-            <h3>${sub.email}</h3>
-            <p>Subscribed • ${new Date(sub.subscribedAt || sub.date || Date.now()).toLocaleDateString()}</p>
+            <h3>${escapeHtml(sub.email)}</h3>
+            <p>Subscribed • ${escapeHtml(new Date(sub.subscribedAt || sub.date || Date.now()).toLocaleDateString())}</p>
           </div>
           <div class="item-actions">
-            <button class="btn btn-sm btn-secondary" onclick="deleteSubscriber('${sub.id || sub.email}')">Remove</button>
+            <button class="btn btn-sm btn-secondary" onclick="deleteSubscriber('${escapeHtml(sub.id || sub.email)}')">Remove</button>
           </div>
         </div>
       `,
@@ -434,9 +487,9 @@ async function deleteSubscriber(subscriberId) {
   if (!confirm("Are you sure you want to remove this subscriber?")) return;
 
   try {
-    const response = await fetch(`${API}/admin/subscribers/${subscriberId}`, {
+    const response = await adminFetch(`${API}/admin/subscribers/${subscriberId}`, {
       method: "DELETE",
-      headers: { Authorization: `Bearer ${adminToken}` },
+
     });
 
     if (response.ok) {
