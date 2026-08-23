@@ -45,7 +45,7 @@ loadEnvFile();
 
 // Middleware
 app.disable("x-powered-by");
-
+app.set("trust proxy", 1);
 const allowedOrigins = (process.env.CORS_ORIGINS || "")
   .split(",")
   .map((origin) => origin.trim())
@@ -57,10 +57,8 @@ app.use(
     origin: allowedOrigins.length
       ? (origin, callback) => {
           // Requests without an Origin header are same-origin or server-to-server.
-          if (!origin || allowedOrigins.includes(origin)) {
-            return callback(null, true);
-          }
-          return callback(new Error("Origin is not allowed"));
+          // Reject disallowed origins without throwing an HTML error page.
+          return callback(null, !origin || allowedOrigins.includes(origin));
         }
       : false,
   }),

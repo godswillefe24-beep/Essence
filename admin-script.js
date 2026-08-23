@@ -8,6 +8,21 @@ function adminFetch(url, options = {}) {
   return fetch(url, { ...options, credentials: "include" });
 }
 
+async function readJsonResponse(response) {
+  const body = await response.text();
+  try {
+    return body ? JSON.parse(body) : {};
+  } catch {
+    const contentType = response.headers.get("content-type") || "";
+    const isHtml = contentType.includes("text/html") || /^\s*<!doctype/i.test(body);
+    throw new Error(
+      isHtml
+        ? `Server returned an HTML error page (${response.status}). Check the API route, CORS_ORIGINS, and server logs.`
+        : `Server returned an invalid response (${response.status}).`,
+    );
+  }
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => {
     const entities = {
@@ -132,7 +147,7 @@ async function handleLogin(e) {
     });
 
     if (response.ok) {
-      const data = await response.json();
+      await readJsonResponse(response);
 
       isLoggedIn = true;
       loginContainer.classList.add("hidden");

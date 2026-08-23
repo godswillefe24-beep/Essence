@@ -249,6 +249,22 @@ export function buildSystemPrompt(relevantPosts, pageContext) {
   return prompt;
 }
 
+// ---- Response normalization ---------------------------------------------
+
+export function extractAssistantText(payload) {
+  const choice = payload?.choices?.[0];
+  const content = choice?.delta?.content ?? choice?.message?.content ?? choice?.text;
+  return typeof content === "string"
+    ? content
+    : Array.isArray(content)
+      ? content
+          .map((part) =>
+            typeof part === "string" ? part : typeof part?.text === "string" ? part.text : "",
+          )
+          .join("")
+      : "";
+}
+
 // ---- Route ---------------------------------------------------------------
 
 router.post("/", chatLimiter, async (req, res) => {
@@ -346,6 +362,30 @@ router.post("/", chatLimiter, async (req, res) => {
         .json({ error: "The AI chat is temporarily unavailable." });
     }
 
+    // Some compatible OpenAI-style gateways return one JSON completion even
+    // when stream=true is requested. Normalize that response into the same SSE
+    // contract instead of ending with sources and no assistant text.
+    const responseType = groqResponse.headers.get("content-type") || "";
+    if (responseType.includes("application/json")) {
+      const body = await groqResponse.json();
+      const text = extractAssistantText(body);
+      res.setHeader("Content-Type", "text/event-stream");
+      res.setHeader("Cache-Control", "no-cache");
+      res.setHeader("Connection", "keep-alive");
+      if (typeof res.flushHeaders === "function") res.flushHeaders();
+      res.write(
+        `data: ${JSON.stringify({
+          type: "sources",
+          sources: relevantPosts.map((p) => ({ title: p.title, slug: p.slug })),
+        })}\n\n`,
+      );
+      if (text) {
+        res.write(`data: ${JSON.stringify({ type: "delta", text })}\n\n`);
+      }
+      res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
+      return res.end();
+    }
+
     // --- From here on we're committed to a streaming response ---
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
@@ -364,6 +404,22 @@ router.post("/", chatLimiter, async (req, res) => {
     const decoder = new TextDecoder();
     let buffer = "";
 
+    const forwardPayload = (payload) => {
+      if (payload === "[DONE]") return true;
+      try {
+        const parsed = JSON.parse(payload);
+        const deltaText = extractAssistantText(parsed);
+        if (deltaText) {
+          res.write(
+            `data: ${JSON.stringify({ type: "delta", text: deltaText })}\n\n`,
+          );
+        }
+      } catch {
+        // Partial/incomplete JSON chunk — safe to ignore, next read() will complete it.
+      }
+      return false;
+    };
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -376,24 +432,23 @@ router.post("/", chatLimiter, async (req, res) => {
         const line = rawLine.trim();
         if (!line.startsWith("data:")) continue;
         const payload = line.slice(5).trim();
-
-        if (payload === "[DONE]") {
+        if (forwardPayload(payload)) {
           res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
           res.end();
           return;
         }
+      }
+    }
 
-        try {
-          const parsed = JSON.parse(payload);
-          const deltaText = parsed?.choices?.[0]?.delta?.content;
-          if (deltaText) {
-            res.write(
-              `data: ${JSON.stringify({ type: "delta", text: deltaText })}\n\n`,
-            );
-          }
-        } catch {
-          // Partial/incomplete JSON chunk — safe to ignore, next read() will complete it.
-        }
+    // Some providers close the stream without a final newline. Process the
+    // buffered data before ending, otherwise the last assistant token is lost.
+    const trailingLine = buffer.trim();
+    if (trailingLine.startsWith("data:")) {
+      const trailingPayload = trailingLine.slice(5).trim();
+      if (forwardPayload(trailingPayload)) {
+        res.write(`data: ${JSON.stringify({ type: "done" })}\n\n`);
+        res.end();
+        return;
       }
     }
 
