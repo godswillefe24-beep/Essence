@@ -99,20 +99,38 @@
 
     const urls = shareUrls(document.title, window.location.href);
 
-    const fbBtn = el("button", "post-share-btn post-share-facebook", "f");
+    const fbBtn = el("button", "post-share-btn post-share-facebook");
+    fbBtn.innerHTML =
+      '<svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" d="M13.5 22v-8h2.75l.41-3h-3.16V9.08c0-.87.24-1.46 1.5-1.46h1.8V4.94c-.31-.04-1.38-.14-2.63-.14-2.6 0-4.38 1.59-4.38 4.5V11H7v3h2.79v8h3.71Z" /></svg>';
     fbBtn.title = "Share on Facebook";
-    fbBtn.addEventListener("click", () => window.open(urls.facebook, "share", "width=600,height=400"));
+    fbBtn.setAttribute("aria-label", "Share on Facebook");
+    fbBtn.addEventListener("click", () =>
+      window.open(urls.facebook, "share", "width=600,height=400"),
+    );
 
-    const twBtn = el("button", "post-share-btn post-share-twitter", "\uD835\uDD4F");
+    const twBtn = el("button", "post-share-btn post-share-twitter");
+    twBtn.innerHTML =
+      '<svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" d="M18.9 2H22l-6.77 7.74L23.2 22h-6.25l-4.9-6.4L6.45 22H3.33l7.24-8.28L2.8 2h6.4l4.43 5.86L18.9 2Zm-1.1 17.9h1.73L8.26 3.98H6.4L17.8 19.9Z" /></svg>';
     twBtn.title = "Share on X";
-    twBtn.addEventListener("click", () => window.open(urls.twitter, "share", "width=600,height=400"));
+    twBtn.setAttribute("aria-label", "Share on X");
+    twBtn.addEventListener("click", () =>
+      window.open(urls.twitter, "share", "width=600,height=400"),
+    );
 
-    const liBtn = el("button", "post-share-btn post-share-linkedin", "in");
+    const liBtn = el("button", "post-share-btn post-share-linkedin");
+    liBtn.innerHTML =
+      '<svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" d="M6.5 8.25H3V21h3.5V8.25ZM4.75 3A2.05 2.05 0 1 0 4.75 7.1 2.05 2.05 0 0 0 4.75 3ZM21 13.67c0-3.82-2.04-5.6-4.77-5.6-2.2 0-3.18 1.21-3.73 2.06V8.25H9V21h3.5v-6.3c0-1.66.31-3.27 2.37-3.27 2.03 0 2.05 1.9 2.05 3.38V21H21v-7.33Z" /></svg>';
     liBtn.title = "Share on LinkedIn";
-    liBtn.addEventListener("click", () => window.open(urls.linkedin, "share", "width=600,height=400"));
+    liBtn.setAttribute("aria-label", "Share on LinkedIn");
+    liBtn.addEventListener("click", () =>
+      window.open(urls.linkedin, "share", "width=600,height=400"),
+    );
 
-    const copyBtn = el("button", "post-share-btn post-share-copy", "\uD83D\uDD17");
+    const copyBtn = el("button", "post-share-btn post-share-copy");
+    copyBtn.innerHTML =
+      '<svg aria-hidden="true" viewBox="0 0 24 24"><path fill="currentColor" d="M10.59 13.41a1.99 1.99 0 0 0 2.82 0l3.59-3.59a2 2 0 0 0-2.82-2.82l-1.3 1.3-1.42-1.42 1.3-1.3a4 4 0 0 1 5.65 5.66l-3.59 3.59a4 4 0 0 1-5.65 0l1.42-1.42Zm2.82-2.82a1.99 1.99 0 0 0-2.82 0L7 14.18A2 2 0 0 0 9.82 17l1.3-1.3 1.42 1.42-1.3 1.3a4 4 0 0 1-5.65-5.66l3.59-3.59a4 4 0 0 1 5.65 0l-1.42 1.42Z" /></svg>';
     copyBtn.title = "Copy link";
+    copyBtn.setAttribute("aria-label", "Copy link to this post");
     copyBtn.addEventListener("click", () => {
       navigator.clipboard
         .writeText(window.location.href)

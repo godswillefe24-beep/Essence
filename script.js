@@ -1,18 +1,6 @@
 (() => {
   const API_BASE = `${window.location.origin}/api`;
 
-  const escapeHtml = (value) =>
-    String(value ?? "").replace(/[&<>"']/g, (character) => {
-      const entities = {
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      };
-      return entities[character];
-    });
-
   class BlogDatabase {
     constructor() {
       this.dbName = "BlogDB";
@@ -65,17 +53,14 @@
 
   class AuthManager {
     constructor() {
-      // Authentication is held in an HttpOnly cookie; only non-sensitive
-      // profile display data remains in localStorage.
-      this.token = null;
+      this.token = localStorage.getItem("auth_token");
       this.user = JSON.parse(localStorage.getItem("auth_user") || "null");
-      localStorage.removeItem("auth_token");
     }
 
     init() {
       this.setupAuthUI();
       this.setupAuthModal();
-      if (this.user) {
+      if (this.token) {
         this.defer(this.validateToken.bind(this));
       }
     }
@@ -97,23 +82,17 @@
         authBtn.textContent = `👤 ${this.user.username}`;
         authBtn.setAttribute(
           "aria-label",
-          `Open profile menu for ${this.user.username}`,
-        );
-        authBtn.setAttribute(
-          "aria-expanded",
-          userDropdown.classList.contains("hidden") ? "false" : "true",
+          `Open profile for ${this.user.username}`,
         );
         authBtn.classList.add("logged-in");
         authBtn.onclick = (e) => {
           e.stopPropagation();
-          const isHidden = userDropdown.classList.toggle("hidden");
-          authBtn.setAttribute("aria-expanded", isHidden ? "false" : "true");
+          userDropdown.classList.toggle("hidden");
         };
         this.updateUserProfile();
       } else {
         authBtn.textContent = "👤 Login";
-        authBtn.setAttribute("aria-label", "Open login menu");
-        authBtn.setAttribute("aria-expanded", "false");
+        authBtn.setAttribute("aria-label", "Log in to your account");
         authBtn.classList.remove("logged-in");
         authBtn.onclick = () => {
           const modal = document.getElementById("auth-modal");
@@ -183,8 +162,8 @@
           body: JSON.stringify({ email, password }),
         });
         const data = await response.json();
-        if (response.ok && data.user) {
-          this.setAuth(data.user);
+        if (response.ok && data.token && data.user) {
+          this.setAuth(data.token, data.user);
           message.textContent = "Login successful!";
           message.className = "auth-message success";
           setTimeout(() => {
@@ -220,7 +199,7 @@
         });
         const data = await response.json();
         if (response.ok) {
-          this.setAuth(data.user);
+          this.setAuth(data.token, data.user);
           message.textContent = "Account created successfully!";
           message.className = "auth-message success";
           setTimeout(() => {
@@ -238,9 +217,10 @@
       }
     }
 
-    setAuth(user) {
-      this.token = null;
+    setAuth(token, user) {
+      this.token = token;
       this.user = user;
+      localStorage.setItem("auth_token", token);
       localStorage.setItem("auth_user", JSON.stringify(user));
     }
 
@@ -249,11 +229,6 @@
       this.user = null;
       localStorage.removeItem("auth_token");
       localStorage.removeItem("auth_user");
-      fetch(`${API_BASE}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-        keepalive: true,
-      }).catch(() => {});
       location.reload();
     }
 
@@ -261,7 +236,7 @@
       try {
         const response = await fetch(`${API_BASE}/auth/validate`, {
           method: "POST",
-          credentials: "include",
+          headers: { Authorization: `Bearer ${this.token}` },
         });
         if (!response.ok) {
           this.logout();
@@ -308,45 +283,6 @@
     setTimeout(() => notification.remove(), 2600);
   }
 
-  function formatReadingTime(text = "", fallbackMinutes = 3) {
-    const words = String(text || "")
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean).length;
-    const minutes = Math.max(1, Math.ceil(words / 200));
-    return `${minutes} min read`;
-  }
-
-  function formatRelativeTime(value) {
-    const timestamp = new Date(value);
-    if (Number.isNaN(timestamp.getTime())) return "just now";
-
-    const seconds = Math.max(
-      1,
-      Math.floor((Date.now() - timestamp.getTime()) / 1000),
-    );
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-    const weeks = Math.floor(days / 7);
-
-    if (weeks > 0) return `${weeks} week${weeks > 1 ? "s" : ""} ago`;
-    if (days > 0) return `${days} day${days > 1 ? "s" : ""} ago`;
-    if (hours > 0) return `${hours} hour${hours > 1 ? "s" : ""} ago`;
-    if (minutes > 0) return `${minutes} minute${minutes > 1 ? "s" : ""} ago`;
-    return "just now";
-  }
-
-  function initReadingMeta() {
-    const featuredExcerpt = document.querySelector(
-      ".featured-post .featured-excerpt",
-    );
-    const featuredMeta = document.querySelector(".featured-post .meta-reading");
-    if (featuredMeta) {
-      featuredMeta.textContent = `⏱️ ${formatReadingTime(featuredExcerpt?.textContent || "")}`;
-    }
-  }
-
   function initTheme() {
     const themeToggle = document.querySelector(".theme-toggle, .theme-btn");
     if (!themeToggle) return;
@@ -357,9 +293,8 @@
     }
     themeToggle.setAttribute(
       "aria-label",
-      isDarkMode ? "Switch to light mode" : "Switch to dark mode",
+      isDarkMode ? "Enable light mode" : "Enable dark mode",
     );
-    themeToggle.setAttribute("aria-pressed", String(isDarkMode));
     themeToggle.addEventListener("click", () => {
       document.body.classList.toggle("dark-mode");
       const isDark = document.body.classList.contains("dark-mode");
@@ -367,9 +302,8 @@
       themeToggle.textContent = isDark ? "☀️" : "🌙";
       themeToggle.setAttribute(
         "aria-label",
-        isDark ? "Switch to light mode" : "Switch to dark mode",
+        isDark ? "Enable light mode" : "Enable dark mode",
       );
-      themeToggle.setAttribute("aria-pressed", String(isDark));
       showNotification(
         isDark ? "Dark mode enabled 🌙" : "Light mode enabled ☀️",
         "success",
@@ -421,20 +355,6 @@
     let currentQuery = "";
     let currentSearchResults = [];
 
-    const updateFilterButtons = () => {
-      filterButtons.forEach((btn) => {
-        const isActive = btn.dataset.filter === currentFilter;
-        btn.classList.toggle("active", isActive);
-        btn.setAttribute("aria-pressed", String(isActive));
-      });
-    };
-
-    updateFilterButtons();
-
-    if (searchInput) {
-      searchInput.setAttribute("aria-label", "Search posts");
-    }
-
     const renderPosts = (posts) => {
       if (!postsGrid) return;
       if (!posts.length) {
@@ -444,28 +364,19 @@
       }
 
       postsGrid.innerHTML = posts
-        .map((post) => {
-          const postUrl = `posts/${encodeURIComponent(post.slug || post.id)}.html`;
-          const date = new Date(post.date);
-          const displayDate = Number.isNaN(date.getTime())
-            ? "Date unavailable"
-            : date.toLocaleDateString(undefined, {
-                year: "numeric",
-                month: "short",
-                day: "numeric",
-              });
-          return `
-            <article class="post-card" data-post-id="${escapeHtml(post.id)}">
+        .map(
+          (post) => `
+            <article class="post-card" data-post-id="${post.id}">
               <div class="post-header">
-                <div class="post-category">${escapeHtml(post.category || "Uncategorized")}</div>
+                <div class="post-category">${post.category || "Uncategorized"}</div>
               </div>
-              <h3><a href="${postUrl}">${escapeHtml(post.title)}</a></h3>
-              <p class="post-meta">${escapeHtml(displayDate)}</p>
-              <p class="post-excerpt">${escapeHtml(post.excerpt || "Read this post to learn more.")}</p>
-              <a href="${postUrl}" class="post-link">Read More →</a>
+              <h3><a href="posts/${post.slug}.html">${post.title}</a></h3>
+              <p class="post-meta">${new Date(post.date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</p>
+              <p class="post-excerpt">${post.excerpt || "Read this post to learn more."}</p>
+              <a href="posts/${post.slug}.html" class="post-link">Read More →</a>
             </article>
-          `;
-        })
+          `,
+        )
         .join("");
     };
 
@@ -552,9 +463,6 @@
         });
     };
 
-    let postsRequestController;
-    let postsRequestId = 0;
-
     async function loadPosts() {
       const searchTerm = (searchInput?.value || "").trim();
       const query = searchTerm || currentQuery;
@@ -563,21 +471,17 @@
       url.searchParams.set("page", String(currentPage));
       url.searchParams.set("limit", "6");
 
-      if (query) url.searchParams.set("q", query);
-      if (category) url.searchParams.set("category", category);
-
-      postsRequestController?.abort();
-      const controller = new AbortController();
-      postsRequestController = controller;
-      const requestId = ++postsRequestId;
-      postsGrid?.setAttribute("aria-busy", "true");
+      if (query) {
+        url.searchParams.set("q", query);
+      }
+      if (category) {
+        url.searchParams.set("category", category);
+      }
 
       try {
-        const response = await fetch(url, { signal: controller.signal });
+        const response = await fetch(url);
         if (!response.ok) throw new Error("Failed to load posts");
         const result = await response.json();
-        if (requestId !== postsRequestId) return;
-
         currentSearchResults = result.posts || [];
         renderPosts(currentSearchResults);
         renderPagination(
@@ -589,14 +493,9 @@
           },
         );
       } catch (error) {
-        if (error.name === "AbortError" || requestId !== postsRequestId) return;
         if (postsGrid) {
           postsGrid.innerHTML =
             '<div class="no-posts">Unable to load posts right now.</div>';
-        }
-      } finally {
-        if (requestId === postsRequestId) {
-          postsGrid?.setAttribute("aria-busy", "false");
         }
       }
     }
@@ -611,32 +510,32 @@
           loadPosts();
         }, 120);
       });
+      document.addEventListener("keydown", (event) => {
+        if (
+          (event.metaKey || event.ctrlKey) &&
+          event.key.toLowerCase() === "k"
+        ) {
+          event.preventDefault();
+          searchInput.focus();
+          searchInput.select();
+        }
+        if (
+          event.key === "/" &&
+          document.activeElement?.tagName !== "INPUT" &&
+          document.activeElement?.tagName !== "TEXTAREA"
+        ) {
+          event.preventDefault();
+          searchInput.focus();
+        }
+      });
     }
-
-    document.addEventListener("keydown", (event) => {
-      const activeTag = (event.target?.tagName || "").toLowerCase();
-      const isTyping =
-        ["input", "textarea", "select"].includes(activeTag) ||
-        event.target?.isContentEditable;
-      if (isTyping) return;
-      if (
-        (event.key === "/" &&
-          !event.metaKey &&
-          !event.ctrlKey &&
-          !event.altKey) ||
-        ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k")
-      ) {
-        event.preventDefault();
-        searchInput?.focus();
-        searchInput?.select();
-      }
-    });
 
     filterButtons.forEach((btn) => {
       btn.addEventListener("click", function () {
+        filterButtons.forEach((b) => b.classList.remove("active"));
+        this.classList.add("active");
         currentFilter = this.dataset.filter;
         currentPage = 1;
-        updateFilterButtons();
         showNotification(
           `Filtering by: ${currentFilter === "all" ? "All Posts" : currentFilter}`,
           "info",
@@ -653,12 +552,10 @@
           const tags = await response.json();
           if (tags.length > 0) {
             tagsContainer.innerHTML = tags
-              .map((tag) => {
-                const tagName = String(tag.name || "");
-                const tagValue = tagName.toLowerCase();
-                const count = Number(tag.count) || 0;
-                return `<a href="#" class="tag" data-tag="${escapeHtml(tagValue)}" title="${count} post${count > 1 ? "s" : ""}">${escapeHtml(tagName)}</a>`;
-              })
+              .map(
+                (tag) =>
+                  `<a href="#" class="tag" data-tag="${tag.name.toLowerCase()}" title="${tag.count} post${tag.count > 1 ? "s" : ""}">${tag.name}</a>`,
+              )
               .join("");
             tagsContainer.querySelectorAll(".tag").forEach((tag) => {
               tag.addEventListener("click", (e) => {
@@ -729,114 +626,10 @@
       const commentsCount = section.querySelector(".comments-count");
       if (!postId || !commentsList || !commentsCount) return;
 
-      let allComments = [];
-
       const escapeHtml = (text) => {
         const div = document.createElement("div");
         div.textContent = text;
         return div.innerHTML;
-      };
-
-      const renderReplyForm = (parentId) => `
-        <form class="comment-reply-form hidden" data-parent-id="${parentId}">
-          ${authManager.user ? "" : '<input type="text" class="comment-reply-name" placeholder="Your name..." />'}
-          <textarea rows="2" placeholder="Write a reply..."></textarea>
-          <button type="submit">Post reply</button>
-        </form>`;
-
-      const renderOneComment = (comment, isReply) => `
-        <div class="comment-item${isReply ? " is-reply" : ""}" data-comment-id="${comment.id}">
-          <div class="comment-header">
-            <div>
-              <span class="comment-author">👤 ${escapeHtml(comment.name)}</span>
-              <span class="comment-time">${formatRelativeTime(comment.timestamp)}</span>
-            </div>
-          </div>
-          <p class="comment-text">${escapeHtml(comment.text)}</p>
-          ${isReply ? "" : `<button class="comment-reply" type="button" data-comment-id="${comment.id}">Reply</button>${renderReplyForm(comment.id)}`}
-        </div>`;
-
-      const renderComments = (comments) => {
-        // API returns a flat list ordered by timestamp DESC. Build a
-        // two-level tree: top-level comments (parentId null) each with
-        // their replies nested directly beneath, oldest-reply-first so a
-        // reply thread reads top-to-bottom in the order it happened.
-        // Replies don't get their own Reply button/form — one level of
-        // nesting only, matching most blogs' comment UX and avoiding
-        // unbounded thread depth.
-        const topLevel = comments.filter((c) => !c.parentId);
-        const repliesByParent = {};
-        comments
-          .filter((c) => c.parentId)
-          .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp))
-          .forEach((r) => {
-            (repliesByParent[r.parentId] ||= []).push(r);
-          });
-
-        commentsCount.textContent = comments.length;
-        commentsList.innerHTML =
-          topLevel.length > 0
-            ? topLevel
-                .map(
-                  (comment) =>
-                    renderOneComment(comment, false) +
-                    (repliesByParent[comment.id] || [])
-                      .map((reply) => renderOneComment(reply, true))
-                      .join(""),
-                )
-                .join("")
-            : '<div class="no-comments">Be the first to comment! 💭</div>';
-
-        commentsList.querySelectorAll(".comment-reply").forEach((button) => {
-          button.addEventListener("click", () => {
-            const form = button.nextElementSibling;
-            form?.classList.toggle("hidden");
-            form?.querySelector("textarea")?.focus();
-          });
-        });
-
-        commentsList.querySelectorAll(".comment-reply-form").forEach((form) => {
-          form.addEventListener("submit", async (event) => {
-            event.preventDefault();
-            const textarea = form.querySelector("textarea");
-            const nameField = form.querySelector(".comment-reply-name");
-            const replyText = textarea?.value.trim();
-            const parentId = form.dataset.parentId;
-            if (!replyText) return;
-            if (!authManager.user && !nameField?.value.trim()) {
-              showNotification("Please enter your name", "error");
-              nameField?.focus();
-              return;
-            }
-
-            const submitBtn = form.querySelector("button[type=submit]");
-            submitBtn.disabled = true;
-            try {
-              const headers = { "Content-Type": "application/json" };
-              if (authManager.token)
-                headers.Authorization = `Bearer ${authManager.token}`;
-              const response = await fetch(`${API_BASE}/comments`, {
-                method: "POST",
-                headers,
-                body: JSON.stringify({
-                  postId,
-                  parentId,
-                  name: nameField?.value.trim() || "",
-                  text: replyText,
-                }),
-              });
-              if (response.ok) {
-                await loadComments();
-              } else {
-                showNotification("Failed to post reply", "error");
-              }
-            } catch {
-              showNotification("Failed to post reply", "error");
-            } finally {
-              submitBtn.disabled = false;
-            }
-          });
-        });
       };
 
       const loadComments = async () => {
@@ -844,14 +637,96 @@
           const response = await fetch(`${API_BASE}/comments/${postId}`);
           if (response.ok) {
             const comments = await response.json();
-            allComments = comments;
-            renderComments(allComments);
-            return;
+            commentsCount.textContent = comments.length;
+            const relativeTime = (timestamp) => {
+              const seconds = Math.max(
+                0,
+                Math.floor((Date.now() - new Date(timestamp).getTime()) / 1000),
+              );
+              if (seconds < 60) return "just now";
+              const units = [
+                [31536000, "year"],
+                [2592000, "month"],
+                [604800, "week"],
+                [86400, "day"],
+                [3600, "hour"],
+                [60, "minute"],
+              ];
+              const [unitSeconds, unitName] = units.find(
+                ([size]) => seconds >= size,
+              ) || [1, "second"];
+              const count = Math.floor(seconds / unitSeconds);
+              return `${count} ${unitName}${count === 1 ? "" : "s"} ago`;
+            };
+            const byParent = new Map();
+            comments.forEach((comment) => {
+              const key = comment.parentId || "root";
+              if (!byParent.has(key)) byParent.set(key, []);
+              byParent.get(key).push(comment);
+            });
+            const renderComment = (comment, isReply = false) => `
+              <div class="comment-item${isReply ? " is-reply" : ""}" data-comment-id="${escapeHtml(comment.id)}">
+                <div class="comment-header"><div>
+                  <span class="comment-author">${escapeHtml(comment.name)}</span>
+                  <time class="comment-time" datetime="${escapeHtml(comment.timestamp)}">${relativeTime(comment.timestamp)}</time>
+                </div></div>
+                <p class="comment-text">${escapeHtml(comment.text)}</p>
+                <div class="comment-actions"><button class="comment-reply" type="button" data-reply-to="${escapeHtml(comment.id)}" aria-label="Reply to ${escapeHtml(comment.name)}">Reply</button></div>
+                <form class="comment-reply-form hidden" data-parent-id="${escapeHtml(comment.id)}">
+                  <textarea name="reply" rows="2" maxlength="500" placeholder="Write a reply..." aria-label="Reply text" required></textarea>
+                  <input name="name" maxlength="80" placeholder="Your name" aria-label="Your name" ${authManager.user ? "hidden" : "required"} />
+                  <button type="submit">Post reply</button>
+                </form>
+                ${(byParent.get(comment.id) || []).map((reply) => renderComment(reply, true)).join("")}
+              </div>`;
+            const roots = byParent.get("root") || [];
+            commentsList.innerHTML = roots.length
+              ? roots.map((comment) => renderComment(comment)).join("")
+              : '<div class="no-comments">Be the first to comment! 💭</div>';
+            commentsList
+              .querySelectorAll(".comment-reply")
+              .forEach((button) => {
+                button.addEventListener("click", () => {
+                  const form = commentsList.querySelector(
+                    `form[data-parent-id="${button.dataset.replyTo}"]`,
+                  );
+                  form?.classList.toggle("hidden");
+                  form?.querySelector("textarea")?.focus();
+                });
+              });
+            commentsList
+              .querySelectorAll(".comment-reply-form")
+              .forEach((form) => {
+                form.addEventListener("submit", async (event) => {
+                  event.preventDefault();
+                  const formData = new FormData(form);
+                  const headers = { "Content-Type": "application/json" };
+                  if (authManager.token) {
+                    headers.Authorization = `Bearer ${authManager.token}`;
+                  }
+                  const replyResponse = await fetch(`${API_BASE}/comments`, {
+                    method: "POST",
+                    headers,
+                    body: JSON.stringify({
+                      postId,
+                      parentId: form.dataset.parentId,
+                      name: formData.get("name"),
+                      text: formData.get("reply"),
+                    }),
+                  });
+                  if (replyResponse.ok) {
+                    await loadComments();
+                    showNotification("Reply posted successfully!", "success");
+                  } else {
+                    showNotification("Failed to post reply", "error");
+                  }
+                });
+              });
           }
         } catch (error) {
-          // Ignore and fall back to the empty state.
+          commentsList.innerHTML =
+            '<div class="no-comments">Comments are temporarily unavailable.</div>';
         }
-        renderComments(allComments);
       };
 
       if (authManager.user && nameInput) nameInput.style.display = "none";
@@ -1003,28 +878,12 @@
     }
   }
 
-  // Legacy posts (post1..post16): posts.id is a bare number, decoupled
-  // from the slug ("post5.html" -> id "5"). Admin-created posts: id and
-  // slug are the SAME string (both "post-<timestamp>"), because
-  // server.js sets `postMeta.slug = id` on creation — so for those, the
-  // full slug IS the real id. One regex can't produce the right value
-  // for both cases, so: try the legacy numeric pattern first, and only
-  // fall back to the full slug when that doesn't match (which is exactly
-  // when the URL is a "post-<timestamp>.html" admin-created post).
-  function extractPostIdFromUrl(pathname) {
-    const slugMatch = pathname.match(/\/posts\/([^/]+)\.html/);
-    if (!slugMatch) return null;
-    const slug = slugMatch[1];
-    const legacyMatch = slug.match(/^post(\d+)$/);
-    return legacyMatch ? legacyMatch[1] : slug;
-  }
-
   function initPageViewTracking() {
-    const postId = extractPostIdFromUrl(window.location.pathname);
-    if (!postId) return;
-    fetch(`${API_BASE}/analytics/view/${encodeURIComponent(postId)}`, {
-      method: "POST",
-    }).catch(() => {});
+    const match = window.location.pathname.match(/post(\d+)\.html/);
+    if (!match) return;
+    fetch(`${API_BASE}/analytics/view/${match[1]}`, { method: "POST" }).catch(
+      () => {},
+    );
   }
 
   function generateTOCAndAuthor() {
@@ -1202,7 +1061,8 @@
       const postViews = data.postViews || {};
 
       const ranked = POST_MANIFEST.map((post) => {
-        const postId = extractPostIdFromUrl(`/${post.url}`);
+        const idMatch = post.url.match(/post(\d+)\.html/);
+        const postId = idMatch ? idMatch[1] : null;
         const views = postId ? postViews[postId] || 0 : 0;
         return { ...post, views };
       })
@@ -1234,7 +1094,6 @@
   function init() {
     authManager.init();
     initTheme();
-    initReadingMeta();
     initProgressBar();
     initSearchAndFilters();
     initSharing();

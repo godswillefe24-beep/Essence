@@ -91,8 +91,11 @@ async function enhancePostMetadata() {
 
   posts.forEach((post) => {
     const contentElement =
-      post.querySelector("p") || post.querySelector(".post-content") || post;
-    const content = contentElement.innerText || "";
+      post.querySelector(".post-preview, .post-content, .content") || post;
+    const content = [...contentElement.querySelectorAll("p, li, h2, h3")]
+      .filter((element) => !element.closest(".post-meta"))
+      .map((element) => element.innerText)
+      .join(" ");
     const readingTime = calculateReadingTime(content);
 
     let metaContainer = post.querySelector(".post-meta");
@@ -102,7 +105,9 @@ async function enhancePostMetadata() {
       post.insertAdjacentElement("afterbegin", metaContainer);
     }
 
-    const readingTimeHTML = `<span class="meta-item reading-time">📖 ${readingTime} min read</span>`;
+    const readingLabel =
+      readingTime === 1 ? "1 min read" : `${readingTime} min read`;
+    const readingTimeHTML = `<span class="meta-item reading-time">📖 ${readingLabel}</span>`;
 
     // Guards against BOTH this function's own class ('reading-time', for
     // when it runs twice) AND index.html's separately hardcoded markup
@@ -114,7 +119,10 @@ async function enhancePostMetadata() {
       !metaContainer.innerHTML.includes("reading-time") &&
       !metaContainer.innerHTML.includes("meta-reading")
     ) {
-      metaContainer.innerHTML += readingTimeHTML;
+      metaContainer.innerHTML = metaContainer.innerHTML
+        .replace(/⏱️\s*less than 1|📖\s*Calculating reading time\.\.\./g, "")
+        .trim();
+      metaContainer.insertAdjacentHTML("beforeend", readingTimeHTML);
     }
   });
 }
@@ -354,7 +362,8 @@ class AnalyticsTracker {
           events,
         }),
       });
-      if (!response.ok) throw new Error(`analytics request failed (${response.status})`);
+      if (!response.ok)
+        throw new Error(`analytics request failed (${response.status})`);
       this.pageViews.splice(0, pageViews.length);
       this.events.splice(0, events.length);
     } catch (e) {
