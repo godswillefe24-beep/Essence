@@ -9,6 +9,7 @@ import nodemailer from "nodemailer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { all, get, run, transaction, db } from "./db.js";
+import { getEmbedding } from "./embeddings.js";
 import {
   sanitizeString,
   sanitizeEmail,
@@ -72,7 +73,10 @@ app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
-  res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  res.setHeader(
+    "Permissions-Policy",
+    "camera=(), microphone=(), geolocation=()",
+  );
 
   // Only advertise HSTS when the request actually arrived over HTTPS. This
   // avoids breaking local HTTP development while protecting production.
@@ -169,7 +173,10 @@ function stripDangerousHtml(html) {
       /\s+(?:href|src|xlink:href|action|formaction|poster)\s*=\s*("|')\s*(?:javascript|vbscript|data):[\s\S]*?\1/gi,
       "",
     )
-    .replace(/\s+(?:href|src|xlink:href|action|formaction|poster)\s*=\s*(?:javascript|vbscript|data):[^\s>]+/gi, "");
+    .replace(
+      /\s+(?:href|src|xlink:href|action|formaction|poster)\s*=\s*(?:javascript|vbscript|data):[^\s>]+/gi,
+      "",
+    );
 }
 
 function sanitizePostContent(content) {
@@ -223,7 +230,9 @@ const adminLoginLimiter = rateLimit({
   limit: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many login attempts, please wait before trying again" },
+  message: {
+    error: "Too many login attempts, please wait before trying again",
+  },
 });
 
 const userAuthLimiter = rateLimit({
@@ -231,7 +240,9 @@ const userAuthLimiter = rateLimit({
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  message: { error: "Too many authentication attempts, please try again later" },
+  message: {
+    error: "Too many authentication attempts, please try again later",
+  },
 });
 
 app.use(globalLimiter);
@@ -346,6 +357,19 @@ async function getPostFull(idOrSlug) {
   ]);
 }
 
+function refreshPostEmbedding(postId, title, content) {
+  if (!process.env.HF_TOKEN) return;
+
+  getEmbedding(`${title}\n\n${content}`)
+    .then((embedding) =>
+      run("UPDATE posts SET embedding = ? WHERE id = ?", [
+        JSON.stringify(embedding),
+        postId,
+      ]),
+    )
+    .catch((error) => logError("Refresh post embedding", error));
+}
+
 // Turns a title into a unique slug, appending -2, -3, ... on collision.
 // Falls back to "post" as the base if the title slugifies to nothing at
 // all (e.g. a title made entirely of emoji/symbols) so post creation
@@ -451,7 +475,6 @@ app.post("/api/comments", commentLimiter, async (req, res) => {
     }
 
     const token = getAuthToken(req);
-
 
     let userId = null;
     let userName = sanitizedName;
@@ -682,8 +705,13 @@ app.get("/api/posts", async (req, res) => {
       params.push(category);
     }
 
-    const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-    const countRow = await get(`SELECT COUNT(*) AS count FROM posts ${whereClause}`, params);
+    const whereClause = conditions.length
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
+    const countRow = await get(
+      `SELECT COUNT(*) AS count FROM posts ${whereClause}`,
+      params,
+    );
     const pagination = buildPagination({
       total: Number(countRow?.count || 0),
       page,
@@ -1026,6 +1054,7 @@ app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
 </html>`;
 
     fs.writeFileSync(filepath, html, "utf8");
+    refreshPostEmbedding(postMeta.id, postMeta.title, sanitizedContent);
 
     res.json({ success: true, id: postMeta.id, url: `/posts/${filename}` });
   } catch (error) {
@@ -1128,6 +1157,7 @@ app.put("/api/admin/posts/:id", verifyAdmin, async (req, res) => {
 </html>`;
 
     fs.writeFileSync(filepath, html, "utf8");
+    refreshPostEmbedding(post.id, sanitizedTitle, sanitizedContent);
 
     logInfo("Edit post", `Post "${sanitizedTitle}" updated`);
     res.json({ success: true, id, title: sanitizedTitle });
@@ -1274,7 +1304,12 @@ app.post("/api/auth/register", userAuthLimiter, async (req, res) => {
     const sanitizedUsername = sanitizeString(username).slice(0, 50);
     const sanitizedEmail = sanitizeEmail(email);
 
-    if (!sanitizedUsername || !sanitizedEmail || !password || !confirmPassword) {
+    if (
+      !sanitizedUsername ||
+      !sanitizedEmail ||
+      !password ||
+      !confirmPassword
+    ) {
       return res.status(400).json({ error: "All fields are required" });
     }
     if (password !== confirmPassword) {
@@ -1357,7 +1392,9 @@ app.post("/api/auth/login", userAuthLimiter, async (req, res) => {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
-    const row = await get("SELECT * FROM users WHERE email = ?", [sanitizedEmail]);
+    const row = await get("SELECT * FROM users WHERE email = ?", [
+      sanitizedEmail,
+    ]);
     if (!row) {
       return res.status(401).json({ error: "Invalid email or password" });
     }
@@ -1407,7 +1444,6 @@ app.post("/api/admin/logout", (req, res) => {
 app.post("/api/auth/validate", async (req, res) => {
   try {
     const token = getAuthToken(req);
-
 
     if (!token) {
       return res.status(401).json({ error: "No token provided" });
@@ -1466,7 +1502,6 @@ app.get("/api/users/:username", async (req, res) => {
 app.put("/api/users/profile/:id", async (req, res) => {
   try {
     const token = getAuthToken(req);
-
 
     if (!token) {
       return res.status(401).json({ error: "No token provided" });
@@ -1797,7 +1832,9 @@ app.post("/api/analytics", async (req, res) => {
 
     events.forEach((event) => {
       if (!event || typeof event !== "object") return;
-      const name = String(event.name || "").trim().slice(0, 100);
+      const name = String(event.name || "")
+        .trim()
+        .slice(0, 100);
       if (!/^[A-Za-z0-9_.:%-]{1,100}$/.test(name)) return;
       const page = normalizeAnalyticsPage(event.data?.page || event.page);
       statements.push({
@@ -1816,7 +1853,8 @@ app.post("/api/analytics", async (req, res) => {
     });
 
     const pageViewCount = pageViews.filter(
-      (view) => view && typeof view === "object" && normalizeAnalyticsPage(view.page),
+      (view) =>
+        view && typeof view === "object" && normalizeAnalyticsPage(view.page),
     ).length;
     const eventCount = statements.length - pageViewCount;
     statements.unshift({
@@ -1977,7 +2015,8 @@ function getTopCategories(posts) {
 }
 
 async function getPageViewTrend() {
-  const rows = await all(`SELECT substr(created_at, 1, 10) AS date, COUNT(*) AS views
+  const rows =
+    await all(`SELECT substr(created_at, 1, 10) AS date, COUNT(*) AS views
                           FROM analytics_events
                           WHERE event_type = 'page_view'
                           GROUP BY substr(created_at, 1, 10)

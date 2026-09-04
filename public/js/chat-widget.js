@@ -11,6 +11,8 @@
   let history = [];
   let isOpen = false;
   let isSending = false;
+  let activeController = null;
+  let lastPrompt = "";
 
   function el(tag, className, text) {
     const e = document.createElement(tag);
@@ -66,9 +68,14 @@
     input.rows = 1;
     input.placeholder = "Type a message…";
     const sendBtn = el("button", "essence-chat-send", "Send");
+    const cancelBtn = el("button", "essence-chat-cancel", "Stop");
+    cancelBtn.type = "button";
+    cancelBtn.hidden = true;
+    cancelBtn.setAttribute("aria-label", "Stop generating a response");
 
     inputRow.appendChild(input);
     inputRow.appendChild(sendBtn);
+    inputRow.appendChild(cancelBtn);
 
     panel.appendChild(header);
     panel.appendChild(messages);
@@ -84,9 +91,17 @@
     sendBtn.addEventListener("click", () =>
       sendMessage(input, messages, sendBtn),
     );
+    cancelBtn.addEventListener("click", () => activeController?.abort());
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault();
+        sendMessage(input, messages, sendBtn);
+      }
+    });
+    root.addEventListener("click", (event) => {
+      const retry = event.target.closest(".essence-chat-retry");
+      if (retry && lastPrompt && !isSending) {
+        input.value = lastPrompt;
         sendMessage(input, messages, sendBtn);
       }
     });
@@ -113,7 +128,13 @@
     if (!text || isSending) return;
 
     isSending = true;
+    lastPrompt = text;
+    activeController = new AbortController();
     sendBtn.disabled = true;
+    const cancelBtn = sendBtn.parentElement.querySelector(
+      ".essence-chat-cancel",
+    );
+    if (cancelBtn) cancelBtn.hidden = false;
     input.value = "";
     input.style.height = "auto";
 
@@ -134,6 +155,7 @@
           history,
           pageContext: getPageContext(),
         }),
+        signal: activeController.signal,
       });
 
       if (!response.ok) {
@@ -190,6 +212,12 @@
         } else if (evt.type === "error") {
           replyMsg.textContent = evt.message || "Something went wrong.";
           replyMsg.classList.remove("essence-chat-typing");
+          if (!replyMsg.querySelector(".essence-chat-retry")) {
+            const retry = el("button", "essence-chat-retry", "Try again");
+            retry.type = "button";
+            retry.setAttribute("aria-label", "Try the AI request again");
+            replyMsg.appendChild(retry);
+          }
         }
       };
 
@@ -212,18 +240,29 @@
         // Stream ended with nothing rendered (e.g. immediate error event).
         replyMsg.classList.remove("essence-chat-typing");
         if (!replyMsg.textContent || replyMsg.textContent === "Thinking…") {
-          replyMsg.textContent = "Didn't get a response — please try again.";
+          replyMsg.textContent = "Didn't get a response.";
+          const retry = el("button", "essence-chat-retry", "Try again");
+          retry.type = "button";
+          retry.setAttribute("aria-label", "Try the AI request again");
+          replyMsg.appendChild(retry);
         }
       }
 
       if (sources.length > 0) {
         const sourcesEl = el("div", "essence-chat-sources");
-        sourcesEl.textContent =
-          "Based on: " +
-          sources
-            .map((s) => s.title)
-            .filter(Boolean)
-            .join(", ");
+        sourcesEl.appendChild(document.createTextNode("Based on: "));
+        sources.forEach((source) => {
+          if (source.url) {
+            const link = el("a", "essence-chat-source-link", source.title);
+            link.href = source.url;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            sourcesEl.appendChild(link);
+          } else {
+            sourcesEl.appendChild(document.createTextNode(source.title || ""));
+          }
+          sourcesEl.appendChild(document.createTextNode(" "));
+        });
         messages.appendChild(sourcesEl);
         messages.scrollTop = messages.scrollHeight;
       }
@@ -236,12 +275,20 @@
         }
       }
     } catch (err) {
-      replyMsg.textContent =
-        "Couldn't reach the chat service. Please try again shortly.";
+      if (err.name === "AbortError") {
+        replyMsg.textContent = "Response stopped.";
+      } else {
+        replyMsg.textContent = "Couldn't reach the chat service.";
+        const retry = el("button", "essence-chat-retry", "Try again");
+        retry.type = "button";
+        replyMsg.appendChild(retry);
+      }
       replyMsg.classList.remove("essence-chat-typing");
     } finally {
       isSending = false;
       sendBtn.disabled = false;
+      if (cancelBtn) cancelBtn.hidden = true;
+      activeController = null;
     }
   }
 
