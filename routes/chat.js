@@ -253,13 +253,18 @@ export function buildSystemPrompt(relevantPosts, pageContext) {
 
 export function extractAssistantText(payload) {
   const choice = payload?.choices?.[0];
-  const content = choice?.delta?.content ?? choice?.message?.content ?? choice?.text;
+  const content =
+    choice?.delta?.content ?? choice?.message?.content ?? choice?.text;
   return typeof content === "string"
     ? content
     : Array.isArray(content)
       ? content
           .map((part) =>
-            typeof part === "string" ? part : typeof part?.text === "string" ? part.text : "",
+            typeof part === "string"
+              ? part
+              : typeof part?.text === "string"
+                ? part.text
+                : "",
           )
           .join("")
       : "";
@@ -350,12 +355,10 @@ router.post("/", chatLimiter, async (req, res) => {
         errText,
       );
       if (groqResponse.status === 429) {
-        return res
-          .status(429)
-          .json({
-            error:
-              "The AI chat is busy right now — please try again in a minute.",
-          });
+        return res.status(429).json({
+          error:
+            "The AI chat is busy right now — please try again in a minute.",
+        });
       }
       return res
         .status(502)
@@ -403,13 +406,25 @@ router.post("/", chatLimiter, async (req, res) => {
     const reader = groqResponse.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
+    let sentAnyDelta = false;
 
     const forwardPayload = (payload) => {
-      if (payload === "[DONE]") return true;
+      if (payload === "[DONE]") {
+        if (!sentAnyDelta) {
+          res.write(
+            `data: ${JSON.stringify({
+              type: "error",
+              message: "The AI returned an empty response. Please try again.",
+            })}\n\n`,
+          );
+        }
+        return true;
+      }
       try {
         const parsed = JSON.parse(payload);
         const deltaText = extractAssistantText(parsed);
         if (deltaText) {
+          sentAnyDelta = true;
           res.write(
             `data: ${JSON.stringify({ type: "delta", text: deltaText })}\n\n`,
           );
@@ -450,6 +465,15 @@ router.post("/", chatLimiter, async (req, res) => {
         res.end();
         return;
       }
+    }
+
+    if (!sentAnyDelta) {
+      res.write(
+        `data: ${JSON.stringify({
+          type: "error",
+          message: "The AI returned an empty response. Please try again.",
+        })}\n\n`,
+      );
     }
 
     // Stream ended without an explicit [DONE] marker (uncommon, but be safe).
