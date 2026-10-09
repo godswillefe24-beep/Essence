@@ -1,6 +1,21 @@
 (() => {
   const API_BASE = `${window.location.origin}/api`;
 
+  async function readApiJson(response) {
+    const contentType = response.headers.get("content-type") || "";
+    const responseText = await response.text();
+    try {
+      return JSON.parse(responseText);
+    } catch {
+      const responseKind = contentType.includes("text/html")
+        ? "HTML page"
+        : contentType || "unknown content";
+      throw new Error(
+        `The server returned an unexpected ${responseKind} (HTTP ${response.status}). Please reload and try again.`,
+      );
+    }
+  }
+
   class BlogDatabase {
     constructor() {
       this.dbName = "BlogDB";
@@ -161,7 +176,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
-        const data = await response.json();
+        const data = await readApiJson(response);
         if (response.ok && data.token && data.user) {
           this.setAuth(data.token, data.user);
           message.textContent = "Login successful!";
@@ -197,7 +212,7 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username, email, password, confirmPassword }),
         });
-        const data = await response.json();
+        const data = await readApiJson(response);
         if (response.ok) {
           this.setAuth(data.token, data.user);
           message.textContent = "Account created successfully!";
@@ -241,7 +256,7 @@
         if (!response.ok) {
           this.logout();
         } else {
-          const data = await response.json();
+          const data = await readApiJson(response);
           this.user = data.user;
           localStorage.setItem("auth_user", JSON.stringify(data.user));
         }
