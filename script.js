@@ -173,12 +173,14 @@
       try {
         const response = await fetch(`${API_BASE}/auth/login`, {
           method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password }),
         });
         const data = await readApiJson(response);
-        if (response.ok && data.token && data.user) {
-          this.setAuth(data.token, data.user);
+        if (response.ok && data.user) {
+          this.setAuth(data.user, data.token);
           message.textContent = "Login successful!";
           message.className = "auth-message success";
           setTimeout(() => {
@@ -209,12 +211,14 @@
       try {
         const response = await fetch(`${API_BASE}/auth/register`, {
           method: "POST",
+          credentials: "same-origin",
+          cache: "no-store",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ username, email, password, confirmPassword }),
         });
         const data = await readApiJson(response);
-        if (response.ok) {
-          this.setAuth(data.token, data.user);
+        if (response.ok && data.user) {
+          this.setAuth(data.user, data.token);
           message.textContent = "Account created successfully!";
           message.className = "auth-message success";
           setTimeout(() => {
@@ -232,10 +236,14 @@
       }
     }
 
-    setAuth(token, user) {
+    setAuth(user, token = null) {
       this.token = token;
       this.user = user;
-      localStorage.setItem("auth_token", token);
+      if (token) {
+        localStorage.setItem("auth_token", token);
+      } else {
+        localStorage.removeItem("auth_token");
+      }
       localStorage.setItem("auth_user", JSON.stringify(user));
     }
 
@@ -244,14 +252,19 @@
       this.user = null;
       localStorage.removeItem("auth_token");
       localStorage.removeItem("auth_user");
-      location.reload();
+      fetch(`${API_BASE}/auth/logout`, {
+        method: "POST",
+        credentials: "same-origin",
+      }).finally(() => location.reload());
     }
 
     async validateToken() {
       try {
         const response = await fetch(`${API_BASE}/auth/validate`, {
           method: "POST",
-          headers: { Authorization: `Bearer ${this.token}` },
+          credentials: "same-origin",
+          cache: "no-store",
+          headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
         });
         if (!response.ok) {
           this.logout();
@@ -878,18 +891,15 @@
 
   function initServiceWorker() {
     if (!("serviceWorker" in navigator)) return;
+    const updateServiceWorker = () =>
+      navigator.serviceWorker
+        .register("/service-worker.js", { updateViaCache: "none" })
+        .then((registration) => registration.update())
+        .catch(() => {});
     if (window.requestIdleCallback) {
-      window.requestIdleCallback(() => {
-        navigator.serviceWorker.register("/service-worker.js").catch(() => {});
-      });
+      window.requestIdleCallback(updateServiceWorker);
     } else {
-      setTimeout(
-        () =>
-          navigator.serviceWorker
-            .register("/service-worker.js")
-            .catch(() => {}),
-        1000,
-      );
+      setTimeout(updateServiceWorker, 1000);
     }
   }
 

@@ -128,6 +128,11 @@ app.use((req, res, next) => {
 
 app.use(express.static(__dirname));
 
+app.use("/api/auth", (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
+
 import chatRouter from "./routes/chat.js";
 app.use("/api/chat", chatRouter);
 
@@ -1388,7 +1393,7 @@ app.post("/api/auth/login", userAuthLimiter, async (req, res) => {
     const { email, password } = req.body;
     const sanitizedEmail = sanitizeEmail(email);
 
-    if (!sanitizedEmail || !password) {
+    if (!sanitizedEmail || typeof password !== "string" || !password) {
       return res.status(400).json({ error: "Email and password are required" });
     }
 
@@ -1399,6 +1404,9 @@ app.post("/api/auth/login", userAuthLimiter, async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
     const user = mapUser(row);
+    if (typeof user.password !== "string" || !user.password) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
 
     const passwordMatch = await bcrypt.compare(password, user.password);
     if (!passwordMatch) {
@@ -1426,7 +1434,7 @@ app.post("/api/auth/login", userAuthLimiter, async (req, res) => {
       },
     });
   } catch (error) {
-    logError("Login", error);
+    console.error("[ERROR] Login:", error.stack || error.message);
     res.status(500).json({ error: "Failed to login" });
   }
 });
