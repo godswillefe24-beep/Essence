@@ -126,6 +126,58 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get("/sitemap.xml", async (req, res) => {
+  const siteUrl = "https://essence-blog.com";
+  const postLastModified = new Map();
+
+  try {
+    const posts = await all("SELECT slug, date, updated_at FROM posts");
+    posts.forEach((post) => {
+      if (post.slug) {
+        postLastModified.set(post.slug, post.updated_at || post.date || "");
+      }
+    });
+  } catch (error) {
+    console.error(
+      "Sitemap database lookup failed; using static post files:",
+      error.message,
+    );
+  }
+
+  const postsDirectory = path.join(__dirname, "posts");
+  const staticSlugs = fs.existsSync(postsDirectory)
+    ? fs
+        .readdirSync(postsDirectory)
+        .filter((filename) => filename.endsWith(".html"))
+        .map((filename) => filename.slice(0, -5))
+    : [];
+  const slugs = new Set([...postLastModified.keys(), ...staticSlugs]);
+  const urls = [
+    `${siteUrl}/`,
+    `${siteUrl}/about.html`,
+    ...[...slugs]
+      .sort()
+      .map((slug) => `${siteUrl}/posts/${encodeURIComponent(slug)}.html`),
+  ];
+
+  const entries = urls.map((url) => {
+    const match = url.match(/\/posts\/([^/]+)\.html$/);
+    const slug = match ? decodeURIComponent(match[1]) : null;
+    const lastModified = slug ? postLastModified.get(slug) : "";
+    const parsedDate = lastModified ? new Date(lastModified) : null;
+    const lastmod =
+      parsedDate && !Number.isNaN(parsedDate.getTime())
+        ? `<lastmod>${parsedDate.toISOString()}</lastmod>`
+        : "";
+    return `<url><loc>${escapeXml(url)}</loc>${lastmod}</url>`;
+  });
+
+  res.type("application/xml").set("Cache-Control", "public, max-age=300");
+  res.send(
+    `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${entries.join("")}</urlset>`,
+  );
+});
+
 app.use(express.static(__dirname));
 
 app.use("/api/auth", (req, res, next) => {

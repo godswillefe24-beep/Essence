@@ -141,6 +141,16 @@ Admin routes require `Authorization: Bearer <token>` from `/api/admin/login`.
 
 `render.yaml` auto-generates `JWT_SECRET` and `ADMIN_PASSWORD`.
 
+## Search Engine Indexing
+
+The site allows public crawling and serves a sitemap at `/sitemap.xml`. After deploying to the public HTTPS domain:
+
+1. Verify the domain in [Google Search Console](https://search.google.com/search-console) and submit `https://essence-blog.com/sitemap.xml` under **Sitemaps**.
+2. Verify the same site in [Bing Webmaster Tools](https://www.bing.com/webmasters) and submit the sitemap there.
+3. Use each tool's URL inspection feature to request indexing for the homepage and important article pages.
+
+Discovery and indexing are controlled by each search engine and may take days or weeks; submission does not guarantee ranking or inclusion.
+
 ## AI Chat Setup
 
 See `INTEGRATION.md` for Groq chat widget setup and `SETUP2.md` for semantic embeddings upgrade.
