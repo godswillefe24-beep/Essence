@@ -24,6 +24,9 @@ const __dirname = dirname(__filename);
 const app = express();
 const PORT = Number(process.env.PORT || 3001);
 const HOST = process.env.HOST || "0.0.0.0";
+const PUBLIC_SITE_URL = (
+  process.env.PUBLIC_SITE_URL || "https://my-blog-taqt.onrender.com"
+).replace(/\/$/, "");
 
 function loadEnvFile() {
   const envFile = path.join(__dirname, ".env");
@@ -126,8 +129,15 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get("/robots.txt", (req, res) => {
+  res.type("text/plain").set("Cache-Control", "public, max-age=300");
+  res.send(
+    `User-agent: *\nAllow: /\nDisallow: /admin.html\nDisallow: /api/\nDisallow: /data/\n\nSitemap: ${PUBLIC_SITE_URL}/sitemap.xml\n`,
+  );
+});
+
 app.get("/sitemap.xml", async (req, res) => {
-  const siteUrl = "https://essence-blog.com";
+  const siteUrl = PUBLIC_SITE_URL;
   const postLastModified = new Map();
 
   try {
@@ -960,7 +970,7 @@ app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
     const filename = `${postMeta.slug}.html`;
     const filepath = path.join(postsDir, filename);
     const metaDescription = postMeta.excerpt.replace(/"/g, "'");
-    const canonicalUrl = `https://essence-blog.com/posts/${filename}`;
+    const canonicalUrl = `${PUBLIC_SITE_URL}/posts/${filename}`;
     const formattedDate = new Date(postMeta.date).toLocaleDateString("en-US", {
       year: "numeric",
       month: "long",
@@ -1027,7 +1037,7 @@ app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
           "name": "Essence Blog",
           "logo": {
             "@type": "ImageObject",
-            "url": "https://essence-blog.com/logo.png"
+            "url": "${PUBLIC_SITE_URL}/logo.png"
           }
         },
         "mainEntityOfPage": {
@@ -1797,15 +1807,15 @@ app.get("/rss.xml", (req, res) => {
 
       return {
         title,
-        link: `https://essence-blog.com/posts/${filename}`,
+        link: `${PUBLIC_SITE_URL}/posts/${filename}`,
         description,
         pubDate: new Date(pubDate).toUTCString(),
-        guid: `https://essence-blog.com/posts/${filename}`,
+        guid: `${PUBLIC_SITE_URL}/posts/${filename}`,
       };
     });
 
     const channelTitle = "Essence";
-    const channelLink = "https://essence-blog.com/";
+    const channelLink = `${PUBLIC_SITE_URL}/`;
     const channelDesc =
       "A modern blog with insights, stories, and ideas on technology and design.";
 

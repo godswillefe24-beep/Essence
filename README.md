@@ -54,6 +54,7 @@ copy .env.example .env
 | `SENDGRID_API_KEY`, `EMAIL_FROM` | SendGrid alternative for emails |
 | `MAILCHIMP_API_KEY`, `MAILCHIMP_LIST_ID` | Mailchimp list sync |
 | `CORS_ORIGINS` | Comma-separated browser origins allowed for cross-origin API access; leave empty for same-origin only |
+| `PUBLIC_SITE_URL` | Canonical public origin used by robots.txt, sitemap, RSS, and newly generated article metadata; defaults to the Render service URL |
 
 ### 3. Initialize the database
 

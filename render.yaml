@@ -8,6 +8,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: PUBLIC_SITE_URL
+        value: https://my-blog-taqt.onrender.com
       - key: PORT
         value: 10000
       - key: JWT_SECRET

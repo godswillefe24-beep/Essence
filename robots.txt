@@ -4,4 +4,4 @@ Disallow: /admin.html
 Disallow: /api/
 Disallow: /data/
 
-Sitemap: https://essence-blog.com/sitemap.xml
+Sitemap: https://my-blog-taqt.onrender.com/sitemap.xml
