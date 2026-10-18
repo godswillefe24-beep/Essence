@@ -144,48 +144,33 @@ app.get("/robots.txt", (req, res) => {
   );
 });
 
-app.get("/sitemap.xml", async (req, res) => {
+app.get("/sitemap.xml", (req, res) => {
   const siteUrl = PUBLIC_SITE_URL;
-  const postLastModified = new Map();
-
-  try {
-    const posts = await all("SELECT slug, date, updated_at FROM posts");
-    posts.forEach((post) => {
-      if (post.slug) {
-        postLastModified.set(post.slug, post.updated_at || post.date || "");
-      }
-    });
-  } catch (error) {
-    console.error(
-      "Sitemap database lookup failed; using static post files:",
-      error.message,
-    );
-  }
 
   const postsDirectory = path.join(__dirname, "posts");
-  const staticSlugs = fs.existsSync(postsDirectory)
+  const postFiles = fs.existsSync(postsDirectory)
     ? fs
         .readdirSync(postsDirectory)
-        .filter((filename) => filename.endsWith(".html"))
-        .map((filename) => filename.slice(0, -5))
+        .filter(
+          (filename) =>
+            filename.endsWith(".html") && filename !== "post-template.html",
+        )
     : [];
-  const slugs = new Set([...postLastModified.keys(), ...staticSlugs]);
   const urls = [
     `${siteUrl}/`,
     `${siteUrl}/about.html`,
-    ...[...slugs]
+    ...postFiles
       .sort()
-      .map((slug) => `${siteUrl}/posts/${encodeURIComponent(slug)}.html`),
+      .map((filename) => `${siteUrl}/posts/${encodeURIComponent(filename)}`),
   ];
 
   const entries = urls.map((url) => {
     const match = url.match(/\/posts\/([^/]+)\.html$/);
-    const slug = match ? decodeURIComponent(match[1]) : null;
-    const lastModified = slug ? postLastModified.get(slug) : "";
-    const parsedDate = lastModified ? new Date(lastModified) : null;
+    const filename = match ? decodeURIComponent(match[1]) + ".html" : null;
+    const postPath = filename ? path.join(postsDirectory, filename) : null;
     const lastmod =
-      parsedDate && !Number.isNaN(parsedDate.getTime())
-        ? `<lastmod>${parsedDate.toISOString()}</lastmod>`
+      postPath && fs.existsSync(postPath)
+        ? `<lastmod>${fs.statSync(postPath).mtime.toISOString()}</lastmod>`
         : "";
     return `<url><loc>${escapeXml(url)}</loc>${lastmod}</url>`;
   });
