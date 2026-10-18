@@ -129,6 +129,14 @@ app.use((req, res, next) => {
   next();
 });
 
+app.get("/googleef4786a5e3b3d122.html", (req, res) => {
+  res
+    .status(200)
+    .type("text/html")
+    .set("Cache-Control", "no-cache")
+    .send("google-site-verification: googleef4786a5e3b3d122.html");
+});
+
 app.get("/robots.txt", (req, res) => {
   res.type("text/plain").set("Cache-Control", "public, max-age=300");
   res.send(
