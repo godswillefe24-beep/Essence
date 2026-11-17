@@ -1,16 +1,5 @@
 (() => {
   const API_BASE = `${window.location.origin}/api`;
-  const escapeHtml = (value) =>
-    String(value ?? "").replace(/[&<>"']/g, (character) => {
-      const entities = {
-        "&": "&amp;",
-        "<": "&lt;",
-        ">": "&gt;",
-        '"': "&quot;",
-        "'": "&#39;",
-      };
-      return entities[character];
-    });
 
   async function readApiJson(response) {
     const contentType = response.headers.get("content-type") || "";
@@ -284,29 +273,29 @@
     updateUserProfile() {
       const userInfo = document.getElementById("user-info");
       if (userInfo && this.user) {
-      userInfo.replaceChildren();
-      const heading = document.createElement("h3");
-      heading.textContent = this.user.username;
-      const email = document.createElement("p");
-      email.textContent = this.user.email;
-      const stats = document.createElement("div");
-      stats.className = "user-stats";
-      for (const [label, value] of [
-        ["Posts", this.user.posts],
-        ["Comments", this.user.comments],
-      ]) {
-        const item = document.createElement("div");
-        item.className = "user-stat";
-        const number = document.createElement("div");
-        number.className = "user-stat-number";
-        number.textContent = String(Number(value) || 0);
-        const caption = document.createElement("div");
-        caption.className = "user-stat-label";
-        caption.textContent = label;
-        item.append(number, caption);
-        stats.appendChild(item);
-      }
-      userInfo.append(heading, email, stats);
+        userInfo.replaceChildren();
+        const heading = document.createElement("h3");
+        heading.textContent = this.user.username;
+        const email = document.createElement("p");
+        email.textContent = this.user.email;
+        const stats = document.createElement("div");
+        stats.className = "user-stats";
+        for (const [label, value] of [
+          ["Posts", this.user.posts],
+          ["Comments", this.user.comments],
+        ]) {
+          const item = document.createElement("div");
+          item.className = "user-stat";
+          const number = document.createElement("div");
+          number.className = "user-stat-number";
+          number.textContent = String(Number(value) || 0);
+          const caption = document.createElement("div");
+          caption.className = "user-stat-label";
+          caption.textContent = label;
+          item.append(number, caption);
+          stats.appendChild(item);
+        }
+        userInfo.append(heading, email, stats);
         const logoutBtn = document.getElementById("logout-btn");
         if (logoutBtn) logoutBtn.addEventListener("click", () => this.logout());
       }
@@ -406,20 +395,17 @@
 
       postsGrid.innerHTML = posts
         .map(
-          (post) => {
-            const postUrl = `posts/${encodeURIComponent(post.slug)}.html`;
-            return `
-            <article class="post-card" data-post-id="${escapeHtml(post.id)}">
+          (post) => `
+            <article class="post-card" data-post-id="${post.id}">
               <div class="post-header">
-                <div class="post-category">${escapeHtml(post.category || "Uncategorized")}</div>
+                <div class="post-category">${post.category || "Uncategorized"}</div>
               </div>
-              <h3><a href="${postUrl}">${escapeHtml(post.title)}</a></h3>
+              <h3><a href="posts/${post.slug}.html">${post.title}</a></h3>
               <p class="post-meta">${new Date(post.date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</p>
-              <p class="post-excerpt">${escapeHtml(post.excerpt || "Read this post to learn more.")}</p>
-              <a href="${postUrl}" class="post-link">Read More →</a>
+              <p class="post-excerpt">${post.excerpt || "Read this post to learn more."}</p>
+              <a href="posts/${post.slug}.html" class="post-link">Read More →</a>
             </article>
-          `;
-          },
+          `,
         )
         .join("");
     };
@@ -598,7 +584,7 @@
             tagsContainer.innerHTML = tags
               .map(
                 (tag) =>
-                  `<a href="#" class="tag" data-tag="${escapeHtml(tag.name.toLowerCase())}" title="${Number(tag.count) || 0} post${tag.count > 1 ? "s" : ""}">${escapeHtml(tag.name)}</a>`,
+                  `<a href="#" class="tag" data-tag="${tag.name.toLowerCase()}" title="${tag.count} post${tag.count > 1 ? "s" : ""}">${tag.name}</a>`,
               )
               .join("");
             tagsContainer.querySelectorAll(".tag").forEach((tag) => {
