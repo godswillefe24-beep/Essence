@@ -4,6 +4,8 @@
 // app.listen() at import time, which makes it awkward to import just a
 // couple of functions from it for testing.
 
+import sanitizeHtml from "sanitize-html";
+
 /**
  * Converts a post title into a URL-safe slug: lowercase, alphanumeric
  * words joined by single hyphens, no leading/trailing hyphens, capped at
@@ -35,6 +37,30 @@ export function sanitizeEmail(email) {
   if (typeof email !== "string") return "";
   const trimmed = email.trim().toLowerCase();
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed) ? trimmed : "";
+}
+
+export function sanitizePostContent(content) {
+  if (typeof content !== "string") return "";
+  return sanitizeHtml(content.slice(0, 5000), {
+    allowedTags: [
+      "a", "blockquote", "br", "caption", "code", "dd", "div", "dl", "dt",
+      "em", "figcaption", "figure", "h1", "h2", "h3", "h4", "h5", "h6",
+      "hr", "i", "img", "li", "ol", "p", "pre", "s", "small", "span",
+      "strong", "sub", "sup", "table", "tbody", "td", "th", "thead", "tr",
+      "u", "ul",
+    ],
+    allowedAttributes: {
+      a: ["href", "target", "rel"],
+      img: ["src", "alt", "title", "width", "height"],
+      "*": ["class"],
+    },
+    allowedSchemes: ["http", "https", "mailto"],
+    allowedSchemesByTag: { img: ["http", "https"] },
+    allowProtocolRelative: false,
+    transformTags: {
+      a: sanitizeHtml.simpleTransform("a", { rel: "noopener noreferrer" }, true),
+    },
+  });
 }
 
 export function escapeXml(unsafe) {

@@ -1,5 +1,16 @@
 (() => {
   const API_BASE = `${window.location.origin}/api`;
+  const escapeHtml = (value) =>
+    String(value ?? "").replace(/[&<>"']/g, (character) => {
+      const entities = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      };
+      return entities[character];
+    });
 
   async function readApiJson(response) {
     const contentType = response.headers.get("content-type") || "";
@@ -68,14 +79,13 @@
 
   class AuthManager {
     constructor() {
-      this.token = localStorage.getItem("auth_token");
       this.user = JSON.parse(localStorage.getItem("auth_user") || "null");
     }
 
     init() {
       this.setupAuthUI();
       this.setupAuthModal();
-      if (this.token) {
+      if (this.user) {
         this.defer(this.validateToken.bind(this));
       }
     }
@@ -180,7 +190,7 @@
         });
         const data = await readApiJson(response);
         if (response.ok && data.user) {
-          this.setAuth(data.user, data.token);
+          this.setAuth(data.user);
           message.textContent = "Login successful!";
           message.className = "auth-message success";
           setTimeout(() => {
@@ -218,7 +228,7 @@
         });
         const data = await readApiJson(response);
         if (response.ok && data.user) {
-          this.setAuth(data.user, data.token);
+          this.setAuth(data.user);
           message.textContent = "Account created successfully!";
           message.className = "auth-message success";
           setTimeout(() => {
@@ -236,19 +246,13 @@
       }
     }
 
-    setAuth(user, token = null) {
-      this.token = token;
+    setAuth(user) {
       this.user = user;
-      if (token) {
-        localStorage.setItem("auth_token", token);
-      } else {
-        localStorage.removeItem("auth_token");
-      }
+      localStorage.removeItem("auth_token");
       localStorage.setItem("auth_user", JSON.stringify(user));
     }
 
     logout() {
-      this.token = null;
       this.user = null;
       localStorage.removeItem("auth_token");
       localStorage.removeItem("auth_user");
@@ -264,7 +268,6 @@
           method: "POST",
           credentials: "same-origin",
           cache: "no-store",
-          headers: this.token ? { Authorization: `Bearer ${this.token}` } : {},
         });
         if (!response.ok) {
           this.logout();
@@ -281,19 +284,29 @@
     updateUserProfile() {
       const userInfo = document.getElementById("user-info");
       if (userInfo && this.user) {
-        userInfo.innerHTML = `
-          <h3>${this.user.username}</h3>
-          <p>${this.user.email}</p>
-          <div class="user-stats">
-            <div class="user-stat">
-              <div class="user-stat-number">${this.user.posts || 0}</div>
-              <div class="user-stat-label">Posts</div>
-            </div>
-            <div class="user-stat">
-              <div class="user-stat-number">${this.user.comments || 0}</div>
-              <div class="user-stat-label">Comments</div>
-            </div>
-          </div>`;
+      userInfo.replaceChildren();
+      const heading = document.createElement("h3");
+      heading.textContent = this.user.username;
+      const email = document.createElement("p");
+      email.textContent = this.user.email;
+      const stats = document.createElement("div");
+      stats.className = "user-stats";
+      for (const [label, value] of [
+        ["Posts", this.user.posts],
+        ["Comments", this.user.comments],
+      ]) {
+        const item = document.createElement("div");
+        item.className = "user-stat";
+        const number = document.createElement("div");
+        number.className = "user-stat-number";
+        number.textContent = String(Number(value) || 0);
+        const caption = document.createElement("div");
+        caption.className = "user-stat-label";
+        caption.textContent = label;
+        item.append(number, caption);
+        stats.appendChild(item);
+      }
+      userInfo.append(heading, email, stats);
         const logoutBtn = document.getElementById("logout-btn");
         if (logoutBtn) logoutBtn.addEventListener("click", () => this.logout());
       }
@@ -393,17 +406,20 @@
 
       postsGrid.innerHTML = posts
         .map(
-          (post) => `
-            <article class="post-card" data-post-id="${post.id}">
+          (post) => {
+            const postUrl = `posts/${encodeURIComponent(post.slug)}.html`;
+            return `
+            <article class="post-card" data-post-id="${escapeHtml(post.id)}">
               <div class="post-header">
-                <div class="post-category">${post.category || "Uncategorized"}</div>
+                <div class="post-category">${escapeHtml(post.category || "Uncategorized")}</div>
               </div>
-              <h3><a href="posts/${post.slug}.html">${post.title}</a></h3>
+              <h3><a href="${postUrl}">${escapeHtml(post.title)}</a></h3>
               <p class="post-meta">${new Date(post.date).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" })}</p>
-              <p class="post-excerpt">${post.excerpt || "Read this post to learn more."}</p>
-              <a href="posts/${post.slug}.html" class="post-link">Read More →</a>
+              <p class="post-excerpt">${escapeHtml(post.excerpt || "Read this post to learn more.")}</p>
+              <a href="${postUrl}" class="post-link">Read More →</a>
             </article>
-          `,
+          `;
+          },
         )
         .join("");
     };
@@ -582,7 +598,7 @@
             tagsContainer.innerHTML = tags
               .map(
                 (tag) =>
-                  `<a href="#" class="tag" data-tag="${tag.name.toLowerCase()}" title="${tag.count} post${tag.count > 1 ? "s" : ""}">${tag.name}</a>`,
+                  `<a href="#" class="tag" data-tag="${escapeHtml(tag.name.toLowerCase())}" title="${Number(tag.count) || 0} post${tag.count > 1 ? "s" : ""}">${escapeHtml(tag.name)}</a>`,
               )
               .join("");
             tagsContainer.querySelectorAll(".tag").forEach((tag) => {
@@ -728,13 +744,10 @@
                 form.addEventListener("submit", async (event) => {
                   event.preventDefault();
                   const formData = new FormData(form);
-                  const headers = { "Content-Type": "application/json" };
-                  if (authManager.token) {
-                    headers.Authorization = `Bearer ${authManager.token}`;
-                  }
                   const replyResponse = await fetch(`${API_BASE}/comments`, {
                     method: "POST",
-                    headers,
+                    credentials: "same-origin",
+                    headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       postId,
                       parentId: form.dataset.parentId,
@@ -786,12 +799,10 @@
             return;
           }
           try {
-            const headers = { "Content-Type": "application/json" };
-            if (authManager.token)
-              headers.Authorization = `Bearer ${authManager.token}`;
             const response = await fetch(`${API_BASE}/comments`, {
               method: "POST",
-              headers,
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ postId, name, text }),
             });
             if (response.ok) {

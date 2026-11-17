@@ -10,7 +10,11 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validateComment, validateSubscribeEmail } from "../utils.js";
+import {
+  sanitizePostContent,
+  validateComment,
+  validateSubscribeEmail,
+} from "../utils.js";
 
 test("validateComment", async (t) => {
   await t.test("accepts a valid comment", () => {
@@ -76,5 +80,27 @@ test("validateSubscribeEmail", async (t) => {
     const result = validateSubscribeEmail("  Reader@Example.COM  ");
     assert.equal(result.valid, true);
     assert.equal(result.sanitized, "reader@example.com");
+  });
+});
+
+test("sanitizePostContent", async (t) => {
+  await t.test("preserves safe formatting and links", () => {
+    assert.equal(
+      sanitizePostContent('<p class="lead"><a href="https://example.com">Read</a></p>'),
+      '<p class="lead"><a href="https://example.com" rel="noopener noreferrer">Read</a></p>',
+    );
+  });
+
+  await t.test("removes scriptable markup and dangerous URL schemes", () => {
+    assert.equal(
+      sanitizePostContent(
+        '<p onclick="alert(1)">Hello</p><script>alert(1)</script><a href="javascript:alert(1)">bad</a><img src=x onerror=alert(1)>',
+      ),
+      '<p>Hello</p><a rel="noopener noreferrer">bad</a><img src="x" />',
+    );
+  });
+
+  await t.test("rejects non-string content", () => {
+    assert.equal(sanitizePostContent({ html: "<b>unsafe</b>" }), "");
   });
 });

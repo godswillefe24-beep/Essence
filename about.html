@@ -37,6 +37,7 @@
         <h2>Login</h2>
         <input type="email" id="login-email" placeholder="Email" required />
         <input type="password" id="login-password" placeholder="Password" required />
+        <a href="reset-password.html">Forgot password?</a>
         <button type="submit" class="btn">Login</button>
         <p class="auth-message" id="login-message"></p>
       </form>
@@ -44,8 +45,8 @@
         <h2>Create Account</h2>
         <input type="text" id="register-username" placeholder="Username" required />
         <input type="email" id="register-email" placeholder="Email" required />
-        <input type="password" id="register-password" placeholder="Password (min 6 chars)" required />
-        <input type="password" id="register-confirm" placeholder="Confirm Password" required />
+        <input type="password" id="register-password" placeholder="Password (min 12 chars)" required minlength="12" maxlength="72" autocomplete="new-password" />
+        <input type="password" id="register-confirm" placeholder="Confirm Password" required minlength="12" maxlength="72" autocomplete="new-password" />
         <button type="submit" class="btn">Register</button>
         <p class="auth-message" id="register-message"></p>
       </form>

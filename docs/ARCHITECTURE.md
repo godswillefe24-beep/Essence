@@ -160,9 +160,7 @@ Database access is centralized.
 
 Frontend stores:
 
-auth_token
-
-auth_user
+auth_user (display cache only; never trusted for authorization)
 
 Authentication flow
 
@@ -174,15 +172,11 @@ Backend validates
 
 ↓
 
-JWT returned
+HttpOnly user cookie set
 
 ↓
 
-Stored in localStorage
-
-↓
-
-Authenticated requests use Authorization header
+Authenticated requests include the cookie; state-changing requests require a same-origin Origin header.
 
 ---
 
@@ -248,11 +242,7 @@ Current keys include
 
 blog_data
 
-auth_token
-
-auth_user
-
-admin_token
+auth_user (display cache only)
 
 ---
 

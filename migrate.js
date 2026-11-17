@@ -258,7 +258,7 @@ async function seedSettings() {
     return;
   }
 
-  const passwordHash = await bcrypt.hash(password, 10);
+  const passwordHash = await bcrypt.hash(password, 12);
   await db.execute({
     sql: `INSERT OR REPLACE INTO settings (id, title, description, admin_password_hash)
           VALUES (1, ?, ?, ?)`,

@@ -8,7 +8,7 @@ This guide covers the release that includes the database-backed analytics store,
 
 | Requirement | Production expectation |
 |---|---|
-| Node.js | Node.js 18 or newer; Node.js 20 or newer is preferred for long-lived deployments. |
+| Node.js | Node.js 20 or newer. |
 | Database | A reachable Turso/libSQL database with credentials available only through the deployment secret manager. |
 | HTTPS | Required. Secure cookies are enabled automatically when `NODE_ENV=production` or the request is recognized as HTTPS. |
 | Process manager | A managed service such as Render, systemd, Docker, or another supervisor that restarts the process after failure. |
@@ -31,8 +31,8 @@ Create the production environment through the hosting provider's secret manager.
 | `CORS_ORIGINS` | Usually no | Comma-separated exact origins allowed for cross-origin API calls. Leave empty for the preferred same-origin deployment. Never use `*` for authenticated cross-origin traffic. |
 | `GROQ_API_KEY` | Optional | Required only if the chat integration is enabled. Store it as a secret and apply provider-side quotas. |
 | `HF_TOKEN` | Optional | Required for embedding generation/search. Do not run embedding generation during the web process boot. |
-| `EMAIL_USER`, `EMAIL_PASSWORD` | Optional | Required only for the configured Gmail mail path; use an app password, not a personal account password. |
-| `SENDGRID_API_KEY`, `EMAIL_FROM` | Optional | Alternative email provider configuration. Keep provider credentials server-side. |
+| `EMAIL_USER`, `EMAIL_PASSWORD` | Optional | Gmail mail path; use an app password, not a personal account password. |
+| `SENDGRID_API_KEY`, `EMAIL_FROM` | Optional | Alternative email provider configuration. Keep provider credentials server-side. Configure one email provider for password reset links. |
 | `MAILCHIMP_API_KEY`, `MAILCHIMP_LIST_ID` | Optional | Required only if subscriber synchronization is enabled. |
 
 A minimum production configuration is:

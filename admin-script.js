@@ -1,5 +1,4 @@
 const API = `${window.location.origin}/api`;
-const PASSWORD = "";
 
 let isLoggedIn = false;
 // The admin session is held in an HttpOnly cookie; no JWT is exposed to JS.
@@ -129,6 +128,23 @@ function setupEventListeners() {
   document
     .getElementById("post-form")
     .addEventListener("submit", handlePostSubmit);
+
+  document.getElementById("posts-list").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-post-action]");
+    if (!button) return;
+    if (button.dataset.postAction === "edit") editPost(button.dataset.id);
+    if (button.dataset.postAction === "delete") deletePost(button.dataset.id);
+  });
+  document.getElementById("comments-list").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-comment-id]");
+    if (button) deleteComment(button.dataset.commentId);
+  });
+  document
+    .getElementById("subscribers-list")
+    .addEventListener("click", (event) => {
+      const button = event.target.closest("[data-subscriber-id]");
+      if (button) deleteSubscriber(button.dataset.subscriberId);
+    });
 
   // Save Settings
   document
@@ -346,8 +362,8 @@ async function loadPosts() {
             <p>${escapeHtml(post.category)} • ${escapeHtml(new Date(post.date || Date.now()).toLocaleDateString())}</p>
           </div>
           <div class="item-actions">
-            <button class="btn btn-sm" onclick="editPost('${escapeHtml(post.id)}')">Edit</button>
-            <button class="btn btn-sm btn-secondary" onclick="deletePost('${escapeHtml(post.id)}')">Delete</button>
+            <button class="btn btn-sm" data-post-action="edit" data-id="${escapeHtml(post.id)}">Edit</button>
+            <button class="btn btn-sm btn-secondary" data-post-action="delete" data-id="${escapeHtml(post.id)}">Delete</button>
           </div>
         </div>
       `,
@@ -421,7 +437,7 @@ async function loadComments() {
             <p style="font-size: 0.8rem; margin-top: 5px;">${escapeHtml(new Date(comment.timestamp).toLocaleDateString())}</p>
           </div>
           <div class="item-actions">
-            <button class="btn btn-sm btn-secondary" onclick="deleteComment('${escapeHtml(comment.id)}')">Delete</button>
+            <button class="btn btn-sm btn-secondary" data-comment-id="${escapeHtml(comment.id)}">Delete</button>
           </div>
         </div>
       `,
@@ -481,7 +497,7 @@ async function loadSubscribers() {
             <p>Subscribed • ${escapeHtml(new Date(sub.subscribedAt || sub.date || Date.now()).toLocaleDateString())}</p>
           </div>
           <div class="item-actions">
-            <button class="btn btn-sm btn-secondary" onclick="deleteSubscriber('${escapeHtml(sub.id || sub.email)}')">Remove</button>
+            <button class="btn btn-sm btn-secondary" data-subscriber-id="${escapeHtml(sub.id || sub.email)}">Remove</button>
           </div>
         </div>
       `,

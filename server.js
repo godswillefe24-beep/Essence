@@ -13,6 +13,7 @@ import { getEmbedding } from "./embeddings.js";
 import {
   sanitizeString,
   sanitizeEmail,
+  sanitizePostContent,
   escapeXml,
   buildPagination,
   slugify,
@@ -50,6 +51,19 @@ loadEnvFile();
 // Middleware
 app.disable("x-powered-by");
 app.set("trust proxy", 1);
+if (process.env.NODE_ENV === "production") {
+  if (new URL(PUBLIC_SITE_URL).protocol !== "https:") {
+    throw new Error("PUBLIC_SITE_URL must use HTTPS in production.");
+  }
+}
+
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === "production" && !req.secure) {
+    return res.redirect(308, `${PUBLIC_SITE_URL}${req.originalUrl}`);
+  }
+  next();
+});
+
 const allowedOrigins = (process.env.CORS_ORIGINS || "")
   .split(",")
   .map((origin) => origin.trim())
@@ -75,6 +89,21 @@ app.use(express.json({ limit: "100kb" }));
 app.use((req, res, next) => {
   res.setHeader("X-Content-Type-Options", "nosniff");
   res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader(
+    "Content-Security-Policy",
+    [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "script-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: https:",
+      "font-src 'self' data: https:",
+      "connect-src 'self'",
+    ].join("; "),
+  );
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader(
     "Permissions-Policy",
@@ -144,33 +173,48 @@ app.get("/robots.txt", (req, res) => {
   );
 });
 
-app.get("/sitemap.xml", (req, res) => {
+app.get("/sitemap.xml", async (req, res) => {
   const siteUrl = PUBLIC_SITE_URL;
+  const postLastModified = new Map();
+
+  try {
+    const posts = await all("SELECT slug, date, updated_at FROM posts");
+    posts.forEach((post) => {
+      if (post.slug) {
+        postLastModified.set(post.slug, post.updated_at || post.date || "");
+      }
+    });
+  } catch (error) {
+    console.error(
+      "Sitemap database lookup failed; using static post files:",
+      error.message,
+    );
+  }
 
   const postsDirectory = path.join(__dirname, "posts");
-  const postFiles = fs.existsSync(postsDirectory)
+  const staticSlugs = fs.existsSync(postsDirectory)
     ? fs
         .readdirSync(postsDirectory)
-        .filter(
-          (filename) =>
-            filename.endsWith(".html") && filename !== "post-template.html",
-        )
+        .filter((filename) => filename.endsWith(".html"))
+        .map((filename) => filename.slice(0, -5))
     : [];
+  const slugs = new Set([...postLastModified.keys(), ...staticSlugs]);
   const urls = [
     `${siteUrl}/`,
     `${siteUrl}/about.html`,
-    ...postFiles
+    ...[...slugs]
       .sort()
-      .map((filename) => `${siteUrl}/posts/${encodeURIComponent(filename)}`),
+      .map((slug) => `${siteUrl}/posts/${encodeURIComponent(slug)}.html`),
   ];
 
   const entries = urls.map((url) => {
     const match = url.match(/\/posts\/([^/]+)\.html$/);
-    const filename = match ? decodeURIComponent(match[1]) + ".html" : null;
-    const postPath = filename ? path.join(postsDirectory, filename) : null;
+    const slug = match ? decodeURIComponent(match[1]) : null;
+    const lastModified = slug ? postLastModified.get(slug) : "";
+    const parsedDate = lastModified ? new Date(lastModified) : null;
     const lastmod =
-      postPath && fs.existsSync(postPath)
-        ? `<lastmod>${fs.statSync(postPath).mtime.toISOString()}</lastmod>`
+      parsedDate && !Number.isNaN(parsedDate.getTime())
+        ? `<lastmod>${parsedDate.toISOString()}</lastmod>`
         : "";
     return `<url><loc>${escapeXml(url)}</loc>${lastmod}</url>`;
   });
@@ -212,36 +256,6 @@ function logInfo(context, message) {
 // sanitizeString, sanitizeEmail, escapeXml moved to utils.js so they can be
 // unit tested without importing this whole file (which connects to Turso
 // and starts the server at import time).
-
-// Defense-in-depth filtering for admin-supplied HTML. This is intentionally
-// conservative until a full allowlist sanitizer is introduced: executable and
-// browser-embedded elements are removed, inline handlers are stripped, and
-// dangerous URL schemes are neutralized.
-function stripDangerousHtml(html) {
-  if (typeof html !== "string") return "";
-  return html
-    .replace(
-      /<\s*(?:script|iframe|object|embed|form|input|button|textarea|select|style|link|meta|base|svg|math)(?:\s[^>]*)?>[\s\S]*?<\s*\/\s*(?:script|iframe|object|embed|form|input|button|textarea|select|style|link|meta|base|svg|math)\s*>/gi,
-      "",
-    )
-    .replace(
-      /<\s*\/?\s*(?:script|iframe|object|embed|form|input|button|textarea|select|style|link|meta|base|svg|math)(?:\s[^>]*)?>/gi,
-      "",
-    )
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, "")
-    .replace(
-      /\s+(?:href|src|xlink:href|action|formaction|poster)\s*=\s*("|')\s*(?:javascript|vbscript|data):[\s\S]*?\1/gi,
-      "",
-    )
-    .replace(
-      /\s+(?:href|src|xlink:href|action|formaction|poster)\s*=\s*(?:javascript|vbscript|data):[^\s>]+/gi,
-      "",
-    );
-}
-
-function sanitizePostContent(content) {
-  return stripDangerousHtml(sanitizeString(content));
-}
 
 // Rate limiting — was a hand-rolled in-memory Map that never evicted old
 // keys (unbounded growth for the life of the process). express-rate-limit
@@ -305,7 +319,19 @@ const userAuthLimiter = rateLimit({
   },
 });
 
+const passwordResetLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: "Too many password reset attempts, please try later" },
+});
+
 app.use(globalLimiter);
+app.use("/api/admin", (req, res, next) => {
+  res.setHeader("Cache-Control", "no-store");
+  next();
+});
 
 // ==========================================
 // JWT SECRET — must be set explicitly now.
@@ -345,19 +371,23 @@ function parseCookies(header = "") {
 }
 
 function getAuthToken(req, cookieName = USER_AUTH_COOKIE) {
-  const authHeader = req.headers.authorization || "";
-  if (authHeader.startsWith("Bearer ")) return authHeader.slice(7);
   return parseCookies(req.headers.cookie)[cookieName] || null;
 }
 
-function setAuthCookie(req, res, token, cookieName = USER_AUTH_COOKIE) {
+function setAuthCookie(
+  req,
+  res,
+  token,
+  cookieName = USER_AUTH_COOKIE,
+  maxAgeSeconds = AUTH_MAX_AGE_SECONDS,
+) {
   const secure =
     process.env.NODE_ENV === "production" ||
     req.secure ||
     req.get("x-forwarded-proto") === "https";
   const attributes = [
     `${cookieName}=${encodeURIComponent(token)}`,
-    `Max-Age=${AUTH_MAX_AGE_SECONDS}`,
+    `Max-Age=${maxAgeSeconds}`,
     "Path=/",
     "HttpOnly",
     "SameSite=Strict",
@@ -384,14 +414,85 @@ function clearAuthCookie(req, res, cookieName = USER_AUTH_COOKIE) {
   res.append("Set-Cookie", attributes.join("; "));
 }
 
-// Email configuration (using test credentials - configure with real service)
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER || "your-email@gmail.com",
-    pass: process.env.EMAIL_PASSWORD || "your-app-password",
-  },
+app.use((req, res, next) => {
+  if (
+    !req.path.startsWith("/api/") ||
+    !["POST", "PUT", "PATCH", "DELETE"].includes(req.method)
+  ) {
+    return next();
+  }
+
+  const origin = req.get("origin");
+  const cookies = parseCookies(req.headers.cookie);
+  const hasAuthCookie =
+    Boolean(cookies[USER_AUTH_COOKIE]) || Boolean(cookies[ADMIN_AUTH_COOKIE]);
+
+  if (!origin) {
+    if (hasAuthCookie) {
+      return res.status(403).json({ error: "Request origin is required" });
+    }
+    return next();
+  }
+
+  try {
+    const requestOrigin = new URL(`${req.protocol}://${req.get("host")}`).origin;
+    if (new URL(origin).origin !== requestOrigin) {
+      return res.status(403).json({ error: "Cross-origin request denied" });
+    }
+  } catch {
+    return res.status(403).json({ error: "Invalid request origin" });
+  }
+
+  next();
 });
+
+const emailConfigured = Boolean(
+  process.env.EMAIL_USER && process.env.EMAIL_PASSWORD,
+);
+const transporter = emailConfigured
+  ? nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
+      },
+    })
+  : null;
+
+async function sendEmail({ to, subject, html }) {
+  if (process.env.SENDGRID_API_KEY) {
+    const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${process.env.SENDGRID_API_KEY}`,
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: to }] }],
+        from: {
+          email: process.env.EMAIL_FROM || "no-reply@essence-blog.com",
+          name: "Essence",
+        },
+        subject,
+        content: [{ type: "text/html", value: html }],
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`SendGrid returned ${response.status}`);
+    }
+    return;
+  }
+
+  if (!transporter) {
+    throw new Error("Email delivery is not configured");
+  }
+  await transporter.sendMail({
+    from: process.env.EMAIL_USER,
+    to,
+    subject,
+    html,
+  });
+}
 
 // ==========================================
 // DATA ACCESS HELPERS (replace old fs-based readX/writeX functions)
@@ -508,10 +609,12 @@ app.post("/api/comments", commentLimiter, async (req, res) => {
   try {
     const { postId, name, text, parentId } = req.body;
 
-    const sanitizedPostId = sanitizeString(postId);
-    const sanitizedName = sanitizeString(name || "Anonymous");
-    const sanitizedText = sanitizeString(text);
-    const sanitizedParentId = parentId ? sanitizeString(parentId) : null;
+    const sanitizedPostId = sanitizeString(postId).slice(0, 100);
+    const sanitizedName = sanitizeString(name || "Anonymous").slice(0, 80);
+    const sanitizedText = sanitizeString(text).slice(0, 500);
+    const sanitizedParentId = parentId
+      ? sanitizeString(parentId).slice(0, 100)
+      : null;
 
     if (!sanitizedPostId || !sanitizedText || sanitizedText.length < 2) {
       return res.status(400).json({
@@ -799,7 +902,7 @@ app.get("/api/posts/:idOrSlug", async (req, res) => {
     if (!post) {
       return res.status(404).json({ error: "Post not found" });
     }
-    res.json(post);
+    res.json({ ...post, content: sanitizePostContent(post.content) });
   } catch (error) {
     logError("Get single post", error);
     res.status(500).json({ error: "Failed to fetch post" });
@@ -905,13 +1008,13 @@ app.get("/api/tags/popular", async (req, res) => {
 // endpoint for genuinely new posts with new ids, not to edit post1-16.
 app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
   try {
-    const { title, category, content, date } = req.body;
-    if (!title || !content) {
+    const { title, category, content } = req.body;
+    if (typeof title !== "string" || typeof content !== "string") {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const sanitizedTitle = sanitizeString(title);
-    const sanitizedCategory = sanitizeString(category || "Uncategorized");
+    const sanitizedTitle = sanitizeString(title).slice(0, 200);
+    const sanitizedCategory = sanitizeString(category || "Uncategorized").slice(0, 80);
     const sanitizedContent = sanitizePostContent(content);
 
     if (!sanitizedTitle || !sanitizedContent) {
@@ -931,7 +1034,7 @@ app.post("/api/admin/posts", verifyAdmin, async (req, res) => {
       id: generatedSlug,
       title: sanitizedTitle,
       category: sanitizedCategory,
-      date: date || new Date().toISOString(),
+      date: new Date().toISOString(),
       slug: generatedSlug,
       excerpt: sanitizedContent.slice(0, 160),
     };
@@ -1153,12 +1256,12 @@ app.put("/api/admin/posts/:id", verifyAdmin, async (req, res) => {
     const { id } = req.params;
     const { title, category, content } = req.body;
 
-    if (!title || !content) {
+    if (typeof title !== "string" || typeof content !== "string") {
       return res.status(400).json({ error: "Title and content are required" });
     }
 
-    const sanitizedTitle = sanitizeString(title);
-    const sanitizedCategory = sanitizeString(category || "Uncategorized");
+    const sanitizedTitle = sanitizeString(title).slice(0, 200);
+    const sanitizedCategory = sanitizeString(category || "Uncategorized").slice(0, 80);
     const sanitizedContent = sanitizePostContent(content);
 
     if (!sanitizedTitle || !sanitizedContent) {
@@ -1271,7 +1374,7 @@ app.post("/api/subscribe", subscribeLimiter, async (req, res) => {
       subscribedAt,
     ]);
 
-    logInfo("Subscribe", `New subscriber: ${sanitizedEmail}`);
+    logInfo("Subscribe", "New subscriber added");
 
     const MAILCHIMP_API_KEY = process.env.MAILCHIMP_API_KEY;
     const MAILCHIMP_LIST_ID = process.env.MAILCHIMP_LIST_ID;
@@ -1331,10 +1434,10 @@ app.post("/api/subscribe", subscribeLimiter, async (req, res) => {
         } catch (sgErr) {
           logError("SendGrid send", sgErr);
         }
-      } else {
+      } else if (transporter) {
         try {
           await transporter.sendMail({
-            from: process.env.EMAIL_USER || "your-email@gmail.com",
+            from: process.env.EMAIL_USER,
             to: sanitizedEmail,
             subject,
             html,
@@ -1367,6 +1470,8 @@ app.post("/api/auth/register", userAuthLimiter, async (req, res) => {
     if (
       !sanitizedUsername ||
       !sanitizedEmail ||
+      typeof password !== "string" ||
+      typeof confirmPassword !== "string" ||
       !password ||
       !confirmPassword
     ) {
@@ -1375,10 +1480,10 @@ app.post("/api/auth/register", userAuthLimiter, async (req, res) => {
     if (password !== confirmPassword) {
       return res.status(400).json({ error: "Passwords do not match" });
     }
-    if (password.length < 8) {
+    if (password.length < 12 || Buffer.byteLength(password, "utf8") > 72) {
       return res
         .status(400)
-        .json({ error: "Password must be at least 8 characters" });
+        .json({ error: "Password must be 12 to 72 bytes long" });
     }
 
     const existing = await get(
@@ -1389,7 +1494,7 @@ app.post("/api/auth/register", userAuthLimiter, async (req, res) => {
       return res.status(400).json({ error: "User already exists" });
     }
 
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     const newUser = {
       id: crypto.randomUUID(),
@@ -1499,6 +1604,110 @@ app.post("/api/auth/logout", (req, res) => {
   res.json({ success: true });
 });
 
+app.post(
+  "/api/auth/password-reset/request",
+  passwordResetLimiter,
+  async (req, res) => {
+    const genericMessage =
+      "If an account exists for that email, a reset link will be sent.";
+    const email = sanitizeEmail(req.body?.email);
+    if (!email || email.length > 254) {
+      return res.json({ success: true, message: genericMessage });
+    }
+
+    try {
+      const user = await get("SELECT id FROM users WHERE email = ?", [email]);
+      if (user) {
+        const token = crypto.randomBytes(32).toString("hex");
+        const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + 30 * 60 * 1000).toISOString();
+        await transaction([
+          {
+            sql: "DELETE FROM password_reset_tokens WHERE user_id = ?",
+            args: [user.id],
+          },
+          {
+            sql: `INSERT INTO password_reset_tokens
+              (token_hash, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)`,
+            args: [tokenHash, user.id, expiresAt, now.toISOString()],
+          },
+        ]);
+
+        const resetUrl = new URL("/reset-password.html", PUBLIC_SITE_URL);
+        resetUrl.searchParams.set("token", token);
+        try {
+          await sendEmail({
+            to: email,
+            subject: "Reset your Essence password",
+            html: `<p>Use this link within 30 minutes to choose a new password:</p><p><a href="${escapeXml(resetUrl.href)}">Reset password</a></p><p>If you did not ask for this, ignore this email.</p>`,
+          });
+        } catch (error) {
+          logError("Password reset email", error);
+          await run("DELETE FROM password_reset_tokens WHERE token_hash = ?", [
+            tokenHash,
+          ]);
+        }
+      }
+
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ success: true, message: genericMessage });
+    } catch (error) {
+      logError("Password reset request", error);
+      res.status(500).json({ error: "Could not process password reset" });
+    }
+  },
+);
+
+app.post(
+  "/api/auth/password-reset/complete",
+  passwordResetLimiter,
+  async (req, res) => {
+    const { token, password } = req.body || {};
+    if (
+      typeof token !== "string" ||
+      !/^[a-f0-9]{64}$/.test(token) ||
+      typeof password !== "string" ||
+      password.length < 12 ||
+      Buffer.byteLength(password, "utf8") > 72
+    ) {
+      return res.status(400).json({
+        error: "Use a valid reset link and a password of 12 to 72 bytes.",
+      });
+    }
+
+    try {
+      const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+      const passwordHash = await bcrypt.hash(password, 12);
+      const now = new Date().toISOString();
+      const results = await transaction([
+        {
+          sql: `UPDATE users SET password = ?
+            WHERE id = (
+              SELECT user_id FROM password_reset_tokens
+              WHERE token_hash = ? AND expires_at > ?
+            )`,
+          args: [passwordHash, tokenHash, now],
+        },
+        {
+          sql: `DELETE FROM password_reset_tokens
+            WHERE token_hash = ? AND expires_at > ?`,
+          args: [tokenHash, now],
+        },
+      ]);
+      if (!results[0]?.rowsAffected) {
+        return res.status(400).json({ error: "This link is invalid or expired." });
+      }
+
+      res.setHeader("Cache-Control", "no-store");
+      res.json({ success: true });
+    } catch (error) {
+      logError("Password reset completion", error);
+      res.status(500).json({ error: "Could not reset password" });
+    }
+  },
+);
+
 app.post("/api/admin/logout", (req, res) => {
   clearAuthCookie(req, res, ADMIN_AUTH_COOKIE);
   res.json({ success: true });
@@ -1576,6 +1785,9 @@ app.put("/api/users/profile/:id", async (req, res) => {
     }
 
     const { bio } = req.body;
+    if (typeof bio !== "string" || bio.length > 500) {
+      return res.status(400).json({ error: "Bio must be 500 characters or fewer" });
+    }
     const existing = await get("SELECT * FROM users WHERE id = ?", [
       req.params.id,
     ]);
@@ -1583,7 +1795,7 @@ app.put("/api/users/profile/:id", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    const newBio = bio || existing.bio;
+    const newBio = sanitizeString(bio).slice(0, 500);
     await run("UPDATE users SET bio = ? WHERE id = ?", [newBio, req.params.id]);
 
     res.json({
@@ -1611,6 +1823,9 @@ app.post("/api/admin/login", adminLoginLimiter, async (req, res) => {
 
   try {
     if (typeof password !== "string" || !password) {
+      return res.status(401).json({ error: "Invalid password" });
+    }
+    if (Buffer.byteLength(password, "utf8") > 72) {
       return res.status(401).json({ error: "Invalid password" });
     }
 
@@ -1728,12 +1943,26 @@ app.get("/api/admin/subscribers/export", verifyAdmin, async (req, res) => {
 app.post("/api/admin/settings", verifyAdmin, async (req, res) => {
   try {
     const { title, description, password } = req.body;
+    if (
+      typeof title !== "string" ||
+      title.trim().length === 0 ||
+      title.length > 120 ||
+      typeof description !== "string" ||
+      description.length > 1000 ||
+      (password !== undefined &&
+        password !== "" &&
+        (typeof password !== "string" ||
+          password.length < 12 ||
+          Buffer.byteLength(password, "utf8") > 72))
+    ) {
+      return res.status(400).json({ error: "Invalid settings values" });
+    }
     const current = await get("SELECT * FROM settings WHERE id = 1");
 
-    const newTitle = title || current?.title || "Essence";
-    const newDescription = description || current?.description || "";
+    const newTitle = title.trim();
+    const newDescription = description.trim();
     const newHash = password
-      ? await bcrypt.hash(password, 10)
+      ? await bcrypt.hash(password, 12)
       : current?.admin_password_hash;
 
     await run(

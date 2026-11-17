@@ -35,11 +35,9 @@ Configured by deployment environment.
 
 # Authentication
 
-Some endpoints require authentication.
+User and admin authentication is carried in separate `HttpOnly`, `SameSite=Strict` cookies. Browsers must use same-origin requests. Tokens are not returned to JavaScript or accepted as bearer tokens.
 
-When authenticated, include:
-
-Authorization: Bearer <token>
+State-changing API requests that use a cookie must include the same-origin `Origin` header; cross-origin requests are rejected.
 
 ---
 
@@ -119,7 +117,7 @@ Validate an existing authentication token.
 
 Authentication
 
-Bearer Token
+Uses the `essence_user_auth` cookie set by login.
 
 Response
 
@@ -363,19 +361,11 @@ POST /api/auth/login
 
 ↓
 
-JWT returned
+HttpOnly user cookie set
 
 ↓
 
-Stored in localStorage
-
-↓
-
-Authorization header added
-
-↓
-
-Protected API requests
+Same-origin browser requests include cookie; server checks Origin on writes
 
 ---
 

@@ -1,10 +1,13 @@
 # Essence — Full Deployment Verification Checklist
 
 ## Before deploying
-- [ ] `node --import ./tests/setup.js --test` passes locally (98 tests)
+- [ ] `npm test` passes locally
 - [ ] `.env` has: TURSO_DATABASE_URL, TURSO_AUTH_TOKEN, JWT_SECRET, ADMIN_PASSWORD,
       GROQ_API_KEY, HF_TOKEN
 - [ ] Render environment variables match `.env` (Environment tab)
+- [ ] Set `NODE_ENV=production` and confirm `PUBLIC_SITE_URL` uses HTTPS
+- [ ] Configure SendGrid or Gmail secrets to enable password reset delivery
+- [ ] Rotate any credentials exposed in prior Git history before launch
 - [ ] `node migrate.js` has been run at least once against production Turso DB
 - [ ] `node embed-posts.js` has been run at least once (chat semantic search)
 

@@ -7,14 +7,14 @@ A full-stack personal blog with 16 static post pages, Turso/libSQL persistence, 
 - Static HTML post pages with SEO metadata (Open Graph, JSON-LD, canonical URLs)
 - Express REST API backed by [Turso](https://turso.tech) (libSQL)
 - Comments, per-post likes, analytics, newsletter subscriptions
-- User registration/login (JWT)
+- User registration/login with bcrypt-hashed passwords and separate HttpOnly cookies
 - Admin dashboard at `/admin.html`
 - AI chat widget (Groq LLM + Hugging Face embeddings for semantic post search)
 - Dark mode, PWA manifest, service worker, RSS feed
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - npm
 - A free Turso database ([turso.tech](https://turso.tech))
 - Optional: Groq API key (chat), Hugging Face token (semantic search), Gmail/SendGrid (email)
@@ -131,7 +131,7 @@ Essence/
 | POST | `/api/admin/login` | Admin login |
 | GET | `/rss.xml` | RSS feed |
 
-Admin routes require `Authorization: Bearer <token>` from `/api/admin/login`.
+Admin routes use the HttpOnly cookie set by `/api/admin/login`; the JWT is never returned to browser JavaScript. User login works the same way. Authenticated browser requests must be same-origin.
 
 ## Deployment (Render)
 
@@ -159,9 +159,10 @@ See `INTEGRATION.md` for Groq chat widget setup and `SETUP2.md` for semantic emb
 ## Security Notes
 
 - Never commit `.env` — it is gitignored.
-- Admin post HTML is sanitized (script tags, iframes, and inline event handlers are stripped).
+- Admin post HTML is sanitized with an allowlist before storage and output.
 - Comments are escaped on the client; inputs are sanitized server-side.
-- Set a strong `JWT_SECRET` and `ADMIN_PASSWORD`.
+- Configure a strong `JWT_SECRET`, `ADMIN_PASSWORD`, and an email provider for password reset.
+- Production redirects HTTP to HTTPS. Review `SECURITY-REVIEW.md` before deploying and rotate any credentials that appeared in Git history.
 
 ## License
 
